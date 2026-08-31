@@ -8,6 +8,38 @@ import (
 	"testing"
 )
 
+// nofenceTask — таска с потерянным закрывающим фенсом: до заголовка только
+// фронтматтер, RestoreFence такую чинит.
+const nofenceTask = `---
+id: ALP-14
+title: без фенса
+status: ready
+project: alpha
+priority: low
+created: 2026-08-01
+
+## Description
+
+Тело.
+`
+
+// nofenceLogTask — тот же дефект, но перед заголовком строка лога: фенс встал
+// бы не туда, поэтому починка обязана отказаться.
+const nofenceLogTask = `---
+id: ALP-15
+title: без фенса, со строкой лога
+status: ready
+project: alpha
+priority: low
+created: 2026-08-01
+claim:
+- 2026-08-01: запись
+
+## Description
+
+Тело.
+`
+
 func brokenVault(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -24,6 +56,10 @@ func brokenVault(t *testing.T) string {
 		"tasks/alpha/nofield.md": "---\nid: ALP-13\ntitle: без приоритета\nstatus: ready\nproject: alpha\ncreated: 2026-08-01\n---\n",
 		// дубль ID
 		"tasks/beta/dup.md": "---\nid: ALP-10\ntitle: дубль\nstatus: ready\nproject: beta\npriority: low\ncreated: 2026-08-01\n---\n",
+		// потерян закрывающий фенс, до заголовка только фронтматтер — чинится
+		"tasks/alpha/nofence.md": nofenceTask,
+		// потерян закрывающий фенс, но перед заголовком строка лога — не чинится
+		"tasks/alpha/nofencelog.md": nofenceLogTask,
 		// историческая форма verify — НЕ проблема, ругаться нельзя
 		"tasks/beta/histverify.md": "---\nid: BET-7\ntitle: со скалярным verify\nstatus: ready\nproject: beta\npriority: low\ncreated: 2026-08-01\nverify: \"pnpm -r typecheck 6/6\"\n---\n",
 	}
@@ -129,5 +165,29 @@ func TestDoctorCleanVault(t *testing.T) {
 	}
 	if n != 0 {
 		t.Fatalf("на чистом vault найдено %d проблем:\n%s", n, buf.String())
+	}
+}
+
+func TestDoctorОтдельнаяКатегорияНезакрытогоФенса(t *testing.T) {
+	root := brokenVault(t)
+	var buf bytes.Buffer
+	if _, err := Doctor(&buf, root, false); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, line := range strings.Split(buf.String(), "\n") {
+		switch {
+		case strings.Contains(line, "ALP-14"):
+			if !strings.HasPrefix(line, "* ") || !strings.Contains(line, "фронтматтер не закрыт") {
+				t.Errorf("чинимый незакрытый фенс должен быть отдельной категорией со звёздочкой: %q", line)
+			}
+		case strings.Contains(line, "ALP-15"):
+			if strings.HasPrefix(line, "* ") {
+				t.Errorf("нечинимый файл помечен звёздочкой: %q", line)
+			}
+			if !strings.Contains(line, "не похожа на фронтматтер") {
+				t.Errorf("в отчёте нет причины, по которой файл не чинится: %q", line)
+			}
+		}
 	}
 }

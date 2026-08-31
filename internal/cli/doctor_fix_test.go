@@ -133,3 +133,19 @@ func TestDoctorFixDoesNotTouchCleanTask(t *testing.T) {
 		t.Errorf("--fix изменил чистую таску:\nбыло:\n%q\nстало:\n%q", before, after)
 	}
 }
+
+func TestDoctorFixВосстанавливаетФенс(t *testing.T) {
+	root, out := fixVault(t)
+
+	body := readTask(t, root, "tasks/alpha/nofence.md")
+	if _, err := vault.Parse([]byte(body)); err != nil {
+		t.Errorf("ALP-14 после починки не разбирается: %v\nвывод:\n%s", err, out)
+	}
+	if !strings.Contains(body, "Тело.") {
+		t.Errorf("тело ALP-14 потеряно:\n%s", body)
+	}
+
+	if got := readTask(t, root, "tasks/alpha/nofencelog.md"); got != nofenceLogTask {
+		t.Errorf("ALP-15 чинить нельзя, но файл изменён:\n%q", got)
+	}
+}

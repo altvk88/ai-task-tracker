@@ -119,6 +119,16 @@ func taskIssues(schema *model.Schema, t model.Task, byID map[string]model.Task) 
 		if subject == "" {
 			subject = filepath.Base(t.Path)
 		}
+		// Незакрытый фенс — отдельная категория: причина понятна без чтения
+		// ошибки yaml, и чинится она своей починкой, а не закавычиванием.
+		if strings.Contains(t.ParseErr, vault.ErrUnclosedFrontmatter.Error()) {
+			fix, reason := fenceFix(t.Path)
+			text := "фронтматтер не закрыт: нет закрывающего ---"
+			if fix == nil {
+				text += "; автоматически не чинится: " + reason
+			}
+			return []issue{{Subject: subject, Text: text, Fix: fix}}
+		}
 		return []issue{{
 			Subject: subject,
 			Text:    "фронтматтер не разбирается: " + oneLine(t.ParseErr),
@@ -230,6 +240,33 @@ func lockIssues(locksDir string, byID map[string]model.Task, schema *model.Schem
 		}
 	}
 	return out, nil
+}
+
+// fenceFix возвращает починку потерянного закрывающего фенса и, если починка
+// неприменима, причину отказа для отчёта. Применимость примеряется на копии в
+// системном temp — тем же способом, что и закавычивание: звёздочка в отчёте
+// обещает, что --fix справится, а RestoreFence чинит не всякий незакрытый
+// фронтматтер (в живом vault одна таска потеряла ещё и заголовок ## Log).
+func fenceFix(path string) (func() error, string) {
+	probe, err := os.CreateTemp("", "tt-doctor-fence-*.md")
+	if err != nil {
+		return nil, oneLine(err.Error())
+	}
+	name := probe.Name()
+	probe.Close()
+	defer os.Remove(name)
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, oneLine(err.Error())
+	}
+	if err := os.WriteFile(name, raw, 0o644); err != nil {
+		return nil, oneLine(err.Error())
+	}
+	if err := vault.RestoreFence(name); err != nil {
+		return nil, oneLine(err.Error())
+	}
+	return func() error { return vault.RestoreFence(path) }, ""
 }
 
 // field — пара ключ/значение строки фронтматтера, которую надо перезаписать.
