@@ -13,14 +13,23 @@ import (
 // apiTask — таска в снимке. Имена и состав полей — как у listRow из
 // internal/cli/list.go: снимок читают и веб-клиент, и агенты, привыкшие к
 // `tt list --json`, расхождение в именах между ними того не стоит.
+//
+// Effort, Completed, BlockedBy и Claim добавлены поверх исходного набора
+// ради веб-доски (TT-033): карточке нужен эффорт и метка занятости, а
+// скрытию старых закрытых тасок — дата завершения. Раздувает снимок, но
+// заводить для этого второй эндпоинт незачем — тасок всё равно 1297.
 type apiTask struct {
-	ID       string `json:"id"`
-	Status   string `json:"status"`
-	Project  string `json:"project"`
-	Priority string `json:"priority"`
-	Title    string `json:"title"`
-	Path     string `json:"path"`
-	ParseErr string `json:"parseError,omitempty"`
+	ID        string    `json:"id"`
+	Status    string    `json:"status"`
+	Project   string    `json:"project"`
+	Priority  string    `json:"priority"`
+	Title     string    `json:"title"`
+	Path      string    `json:"path"`
+	ParseErr  string    `json:"parseError,omitempty"`
+	Effort    string    `json:"effort,omitempty"`
+	Completed string    `json:"completed,omitempty"`
+	BlockedBy []string  `json:"blockedBy,omitempty"`
+	Claim     *apiClaim `json:"claim,omitempty"`
 }
 
 // summary — сводка по снимку.
@@ -50,18 +59,14 @@ type apiClaim struct {
 // его — 1297 тасок в браузер и так едут одним куском) и тело markdown.
 type taskDetail struct {
 	apiTask
-	Due       string    `json:"due,omitempty"`
-	Created   string    `json:"created,omitempty"`
-	Completed string    `json:"completed,omitempty"`
-	ReadyAt   string    `json:"readyAt,omitempty"`
-	Effort    string    `json:"effort,omitempty"`
-	Attempts  int       `json:"attempts,omitempty"`
-	BlockedBy []string  `json:"blockedBy,omitempty"`
-	Verify    []string  `json:"verify,omitempty"`
-	Spec      string    `json:"spec,omitempty"`
-	Result    string    `json:"result,omitempty"`
-	Claim     *apiClaim `json:"claim,omitempty"`
-	Body      string    `json:"body"`
+	Due      string   `json:"due,omitempty"`
+	Created  string   `json:"created,omitempty"`
+	ReadyAt  string   `json:"readyAt,omitempty"`
+	Attempts int      `json:"attempts,omitempty"`
+	Verify   []string `json:"verify,omitempty"`
+	Spec     string   `json:"spec,omitempty"`
+	Result   string   `json:"result,omitempty"`
+	Body     string   `json:"body"`
 }
 
 // errorResponse — единый формат ошибки API.
@@ -83,6 +88,8 @@ func toAPITask(t model.Task, status string) apiTask {
 	return apiTask{
 		ID: t.ID, Status: status, Project: t.Project,
 		Priority: t.Priority, Title: t.Title, Path: t.Path, ParseErr: t.ParseErr,
+		Effort: t.Effort, Completed: t.Completed, BlockedBy: t.BlockedBy,
+		Claim: toAPIClaim(t.Claim),
 	}
 }
 
@@ -159,18 +166,14 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	status, _ := schema.Normalize(task.Status)
 
 	writeJSON(w, http.StatusOK, taskDetail{
-		apiTask:   toAPITask(task, status),
-		Due:       task.Due,
-		Created:   task.Created,
-		Completed: task.Completed,
-		ReadyAt:   task.ReadyAt,
-		Effort:    task.Effort,
-		Attempts:  task.Attempts,
-		BlockedBy: task.BlockedBy,
-		Verify:    []string(task.Verify),
-		Spec:      task.Spec,
-		Result:    task.Result,
-		Claim:     toAPIClaim(task.Claim),
-		Body:      body,
+		apiTask:  toAPITask(task, status),
+		Due:      task.Due,
+		Created:  task.Created,
+		ReadyAt:  task.ReadyAt,
+		Attempts: task.Attempts,
+		Verify:   []string(task.Verify),
+		Spec:     task.Spec,
+		Result:   task.Result,
+		Body:     body,
 	})
 }
