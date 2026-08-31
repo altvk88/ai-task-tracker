@@ -28,16 +28,25 @@ func GenerateToken() (string, error) {
 // у локального пользователя и так есть доступ к файлам vault напрямую;
 // (2) GET/HEAD с любого адреса — иначе открыть доску с телефона по ссылке
 // было бы мучением. Всё остальное с не-loopback адреса требует верного
-// токена. Если Options.Token пуст (сервер поднят без защиты, как в
-// большинстве тестов), проверка отключена целиком.
+// токена.
+//
+// Пустой Options.Token НЕ отключает проверку, а запрещает удалённую запись
+// вовсе: сервер без настроенного токена никого аутентифицировать не может,
+// и правильный ответ на попытку — отказ, а не пропуск. Иначе вторая точка
+// входа, забывшая передать токен, тихо открыла бы запись всей локальной сети.
+// На loopback это ничего не меняет: там запись разрешена и без токена.
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.opts.Token == "" || isLoopbackAddr(r.RemoteAddr) {
+		if isLoopbackAddr(r.RemoteAddr) {
 			next.ServeHTTP(w, r)
 			return
 		}
 		if r.Method == http.MethodGet || r.Method == http.MethodHead {
 			next.ServeHTTP(w, r)
+			return
+		}
+		if s.opts.Token == "" {
+			writeError(w, http.StatusUnauthorized, "удалённая запись запрещена: сервер запущен без токена")
 			return
 		}
 		if !tokenValid(s.opts.Token, requestToken(r)) {

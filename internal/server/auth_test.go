@@ -3,10 +3,14 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/alkulagin-creator/tt/internal/index"
 )
+
+// body — короткая обёртка, чтобы не тащить strings в каждый вызов.
+func body(s string) *strings.Reader { return strings.NewReader(s) }
 
 // newAuthServer поднимает сервер с фиксированным токеном на vault из
 // newWriteVault: содержимое тасок для проверки авторизации не важно, но
@@ -148,5 +152,34 @@ func TestGenerateToken_генерируетНепустойИРазныйКаж�
 	}
 	if len(a) < 32 {
 		t.Fatalf("токен слишком короткий: %d символов", len(a))
+	}
+}
+
+// Пустой токен не должен быть лазейкой: сервер, поднятый без токена, не может
+// никого аутентифицировать, значит удалённую запись обязан отклонять. Иначе
+// вторая точка входа, забывшая передать токен, тихо открыла бы запись всей сети.
+func TestAuth_пустойТокенЗапрещаетУдалённуюЗапись(t *testing.T) {
+	root := newWriteVault(t)
+	ix, err := index.New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := New(ix, root, Options{}).Handler()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/task/W-001/status", body(`{"to":"ready"}`))
+	req.RemoteAddr = "192.168.0.50:51000"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("код %d, ожидался 401: сервер без токена не должен пускать удалённую запись", rec.Code)
+	}
+
+	// На loopback пустой токен по-прежнему ничего не меняет: там запись разрешена.
+	req2 := httptest.NewRequest(http.MethodPost, "/api/task/W-001/status", body(`{"to":"ready"}`))
+	req2.RemoteAddr = "127.0.0.1:51000"
+	rec2 := httptest.NewRecorder()
+	h.ServeHTTP(rec2, req2)
+	if rec2.Code == http.StatusUnauthorized {
+		t.Fatal("на loopback запись без токена обязана проходить")
 	}
 }
