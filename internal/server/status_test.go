@@ -83,6 +83,10 @@ func postStatus(t *testing.T, srv *Server, id, body string) *httptest.ResponseRe
 	t.Helper()
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/task/"+id+"/status", strings.NewReader(body))
+	// httptest.NewRequest ставит внешний RemoteAddr (192.0.2.1), а сервер без
+	// токена удалённую запись запрещает. Эти тесты проверяют логику смены
+	// статуса, а не авторизацию, поэтому запрос объявляется локальным явно.
+	req.RemoteAddr = "127.0.0.1:12345"
 	srv.Handler().ServeHTTP(rr, req)
 	return rr
 }
