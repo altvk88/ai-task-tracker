@@ -63,3 +63,26 @@ func Parse(src []byte) (model.Task, error) {
 	}
 	return t, nil
 }
+
+// Body отдаёт тело таски — всё, что идёт после закрывающего фенса
+// фронтматтера. Условную пустую строку-разделитель между фенсом и телом
+// (она есть почти в каждом файле) вырезает, дальнейшие пустые строки не
+// трогает. Используется там, где нужен сам markdown, а не фронтматтер —
+// например, отдать таску целиком по HTTP.
+func Body(src []byte) (string, error) {
+	src = bytes.TrimPrefix(src, bom)
+	lines := strings.Split(strings.ReplaceAll(string(src), "\r\n", "\n"), "\n")
+	if len(lines) == 0 || !isFence(lines[0]) {
+		return "", ErrNoFrontmatter
+	}
+	for i := 1; i < len(lines); i++ {
+		if isFence(lines[i]) {
+			rest := lines[i+1:]
+			if len(rest) > 0 && rest[0] == "" {
+				rest = rest[1:]
+			}
+			return strings.Join(rest, "\n"), nil
+		}
+	}
+	return "", ErrUnclosedFrontmatter
+}

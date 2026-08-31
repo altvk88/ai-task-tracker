@@ -99,3 +99,60 @@ func TestParseRealTask(t *testing.T) {
 		t.Errorf("Due = %q, пустое значение обязано остаться пустым", got.Due)
 	}
 }
+
+func TestBody(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+		err  bool
+	}{
+		{
+			name: "разделитель-пустая строка вырезается",
+			src:  "---\nid: WEB-1\n---\n\n## Description\n\nтекст\n",
+			want: "## Description\n\nтекст\n",
+		},
+		{
+			name: "без пустой строки после фенса",
+			src:  "---\nid: WEB-1\n---\n## Description\n",
+			want: "## Description\n",
+		},
+		{
+			name: "CRLF",
+			src:  "---\r\nid: WEB-1\r\n---\r\n\r\ntext\r\n",
+			want: "text\n",
+		},
+		{
+			name: "пустое тело",
+			src:  "---\nid: WEB-1\n---\n",
+			want: "",
+		},
+		{
+			name: "нет фронтматтера",
+			src:  "# Просто заметка\n",
+			err:  true,
+		},
+		{
+			name: "фенс не закрыт",
+			src:  "---\nid: WEB-1\n",
+			err:  true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := Body([]byte(c.src))
+			if c.err {
+				if err == nil {
+					t.Fatalf("ожидалась ошибка, получено тело %q", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("неожиданная ошибка: %v", err)
+			}
+			if got != c.want {
+				t.Fatalf("получено %q, ожидалось %q", got, c.want)
+			}
+		})
+	}
+}
