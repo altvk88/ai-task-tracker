@@ -1,0 +1,86 @@
+Dispatch the next task from the project's queue to a subagent, or manage stuck tasks.
+
+You are the **orchestrator** and the **only writer** to the vault. Subagents write
+code in the project repo only; you write all task-file/status changes.
+
+## Usage
+- `/work` — claim and run the single next `ready` task
+- `/work --loop` — drain the queue until empty, a task hits `needs-input`, or the user stops
+- `/work --reset <TASK-ID>` — manually reset a stuck `in-progress` task back to `ready`
+- `/work <TASK-ID>` — force a specific task
+
+All helper scripts live in `~/.claude/lib/`.
+
+## Step 0: Resolve the link
+Run `~/.claude/lib/tt-resolve.sh` (CWD = current repo). Parse `VAULT=` and `PROJECT=`.
+If it exits non-zero, tell the user to run `/init` and stop.
+
+## --reset <ID> path
+1. `~/.claude/lib/tt-lock.sh release "<VAULT>" "<ID>"`
+2. In `<VAULT>/tasks/<PROJECT>/<file for ID>.md`: set `status: ready`, clear the
+   `claim:` block (leave `claim:` empty), increment `attempts`, append Log
+   `- <today>: reset by user (was in-progress)`.
+3. Commit the vault: `git -C "<VAULT>" add -A && git -C "<VAULT>" commit -m "chore(<ID>): manual reset to ready"`.
+4. Report and stop.
+
+## Main / loop path
+Repeat (once for `/work`, until stop-condition for `--loop`):
+
+### A. Reconcile
+- For every task in `<VAULT>/tasks/<PROJECT>/` with `status: backlog`: if **all** IDs
+  in its `blocked_by` are `done`, set `status: ready` (+ `ready_at: <today>`).
+- Do NOT touch `in-progress` tasks (no auto-reclaim). Note any whose `claim.started`
+  looks old and remind the user they can `/work --reset <ID>`.
+
+### B. Select + claim
+- `next=$(~/.claude/lib/tt-status.sh next "<VAULT>" "<PROJECT>")`. Empty → no work:
+  if `--loop`, stop with a summary; else report "queue empty" and stop.
+- Read `<next>` to get its `id`.
+- `~/.claude/lib/tt-lock.sh acquire "<VAULT>" "<id>"`. If it fails (rc=1), the task is
+  already claimed — pick the next candidate (re-run select, skipping this id) and retry.
+- On acquire success, in `<next>`: set `status: in-progress` (canonical, hyphen — NEVER `in_progress`); write
+  `claim: { agent: <session marker>, host: <hostname>, branch: task/<id>-<slug>, started: <ISO now> }`;
+  append Log `- <today>: claimed by <agent>`. Commit the vault.
+  - `<session marker>`: use the harness session id if available, else `<hostname>-<unixtime>-<rand>`.
+  - Mark it the active task for the statusline: `bash ~/.claude/lib/tt-active.sh set "<id>"`
+    (CWD = project repo). Harmless if it fails.
+
+### C. Dispatch to a subagent
+Spawn a subagent (Task tool) whose CWD is the project repo. Pass it:
+- task `id`, `title`, `## Description`, `## Acceptance Criteria`, `## Notes`
+- the branch to use: `task/<id>-<slug>` (create from the repo's default branch)
+- the `verify` commands (Definition of Done)
+- instruction: do the work on the branch, run `verify`, commit in the project repo,
+  and RETURN STRICT JSON only:
+  `{ "status": "done|failed|needs-input", "summary": "...", "commits": ["sha"], "questions": ["..."], "log_notes": ["..."] }`
+The subagent MUST NOT touch the vault.
+
+### D. On return (you write the result)
+Parse the subagent's JSON.
+- `done`: set `status: done`, `completed: <today>`, `result: <summary>`; append Log with
+  `log_notes` and `commits`. Then **auto-promote**: any task whose `blocked_by` are now all
+  `done` → `ready` (+ `ready_at`).
+- `failed`: set `status: failed`, `result: <summary>`, `attempts++`; append Log with the error.
+- `needs-input`: set `status: needs-input`; write the `questions` under `## Open Questions`;
+  append Log. Also surface the questions to the user in the session.
+- Always: clear the `claim:` block and `~/.claude/lib/tt-lock.sh release "<VAULT>" "<id>"`.
+  Also clear the statusline active marker: `bash ~/.claude/lib/tt-active.sh clear` (CWD = project repo).
+- Commit the vault.
+
+### E. Loop control
+- `/work`: stop after one task.
+- `/work --loop`: continue to A. Stop when select returns empty, when a task ended
+  `needs-input` (surface it to the user), or when the user interrupts. At the start of
+  each iteration, re-check the current task's `status` in case the user changed it
+  (`cancelled`/`blocked`) — if so, release and skip.
+
+## Refresh the board
+After any status change in this run (claim, done, failed, needs-input, blocked, reset,
+auto-promote), normalize statuses and regenerate the Kanban board view so Obsidian reflects reality:
+`bash ~/.claude/lib/tt-normalize.sh "<VAULT>" && bash ~/.claude/lib/tt-board.sh "<VAULT>"`
+
+## Final report
+Print: which task(s) ran, their outcomes, any `needs-input` waiting on the user, and the
+updated counts (`~/.claude/lib/tt-status.sh counts "<VAULT>" "<PROJECT>"`).
+
+$ARGUMENTS
