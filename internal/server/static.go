@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io"
 	"io/fs"
 	"net/http"
 
@@ -38,14 +39,29 @@ func staticHandler() http.Handler {
 	})
 }
 
+// notBuiltPage показывается, когда в бинарник вшит пустой dist: фронт не
+// собирали перед `go build`. Страница живёт в коде, а не файлом в dist,
+// потому что любой отслеживаемый файл там перезаписывается сборкой и пачкает
+// рабочее дерево, а закоммиченный собранный index.html ссылался бы на
+// гитигнорируемый JS — чистый клон получил бы битую страницу.
+const notBuiltPage = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>tt</title></head>
+<body style="font-family:system-ui;max-width:40em;margin:3em auto;line-height:1.5">
+<h1>Фронтенд не собран</h1>
+<p>Бинарник собран без веб-бандла. Соберите фронт и пересоберите tt:</p>
+<pre>cd web &amp;&amp; npm install &amp;&amp; npm run build &amp;&amp; cd ..
+go build -o tt.exe ./cmd/tt</pre>
+<p>API при этом работает: <code>/api/snapshot</code>, <code>/api/events</code>.</p>
+</body></html>`
+
 // serveIndex отдаёт содержимое index.html напрямую, в обход http.FileServer.
 func serveIndex(w http.ResponseWriter, sub fs.FS) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	data, err := fs.ReadFile(sub, "index.html")
 	if err != nil {
-		http.Error(w, "index.html не найден", http.StatusNotFound)
+		_, _ = io.WriteString(w, notBuiltPage)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(data)
 }
 

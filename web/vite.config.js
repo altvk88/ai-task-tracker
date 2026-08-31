@@ -9,6 +9,10 @@ export default defineConfig({
   base: './',
   build: {
     outDir: 'dist',
-    emptyOutDir: true,
+    // Каталог не чистим: в нём лежит .gitkeep — единственный отслеживаемый
+    // файл в dist, нужный чтобы go:embed не падал на чистом клоне без
+    // собранного фронта. С emptyOutDir: true vite удалял его при каждой
+    // сборке, и дерево пачкалось изменением, которое коммитить нельзя.
+    emptyOutDir: false,
   },
 });
