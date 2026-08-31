@@ -172,6 +172,24 @@ func TestSetFieldMissingKeyIsInserted(t *testing.T) {
 	}
 }
 
+func TestSetFieldRawWritesUnquotedList(t *testing.T) {
+	p := writeTemp(t, sampleTask)
+	if err := SetFieldRaw(p, "blocked_by", "[WEB-100, WEB-101]"); err != nil {
+		t.Fatalf("SetFieldRaw: %v", err)
+	}
+	after, _ := os.ReadFile(p)
+	if !strings.Contains(string(after), "\nblocked_by: [WEB-100, WEB-101]\n") {
+		t.Errorf("список обязан остаться без кавычек, получено:\n%s", after)
+	}
+	got, err := Parse(after)
+	if err != nil {
+		t.Fatalf("после записи файл перестал парситься: %v", err)
+	}
+	if len(got.BlockedBy) != 2 || got.BlockedBy[0] != "WEB-100" || got.BlockedBy[1] != "WEB-101" {
+		t.Errorf("BlockedBy = %v", got.BlockedBy)
+	}
+}
+
 func TestSetFieldRejectsFileWithoutFrontmatter(t *testing.T) {
 	p := writeTemp(t, "# Просто заметка\n")
 	if err := SetField(p, "status", "ready"); err == nil {

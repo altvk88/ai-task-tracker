@@ -9,16 +9,20 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/alkulagin-creator/tt/internal/cli"
 	"github.com/alkulagin-creator/tt/internal/index"
 	"github.com/alkulagin-creator/tt/internal/server"
+	"github.com/alkulagin-creator/tt/internal/taskop"
 )
 
 const usage = `tt — таск-трекер над markdown-vault
 
 Использование:
   tt list   [--vault ПУТЬ] [--project ИМЯ] [--status СТАТУС] [--json]
+  tt new    [--vault ПУТЬ] --project ИМЯ --title ТЕКСТ [--priority high|medium|low]
+            [--effort 2h] [--depends-on ID,ID] [--spec ПУТЬ]
   tt set    [--vault ПУТЬ] [--agent ИМЯ] ID КЛЮЧ [ЗНАЧЕНИЕ]
   tt doctor [--vault ПУТЬ] [--fix]
   tt serve  [--vault ПУТЬ] [--port N] [--listen АДРЕС] [--agent ИМЯ] [--token ТОКЕН]
@@ -57,6 +61,40 @@ func run(cmd string, args []string) error {
 			return err
 		}
 		return cli.List(os.Stdout, dir, cli.ListOptions{Project: *project, Status: *status, JSON: *asJSON})
+
+	case "new":
+		fs := flag.NewFlagSet("new", flag.ExitOnError)
+		vaultFlag := fs.String("vault", "", "путь к vault")
+		project := fs.String("project", "", "проект (обязателен)")
+		title := fs.String("title", "", "заголовок таски (обязателен)")
+		priority := fs.String("priority", "", "high|medium|low, по умолчанию medium")
+		effort := fs.String("effort", "", "оценка трудозатрат, например 2h")
+		dependsOn := fs.String("depends-on", "", "ID зависимостей через запятую")
+		spec := fs.String("spec", "", "путь к спеке или плану")
+		if err := fs.Parse(args); err != nil {
+			return err
+		}
+		if *project == "" || *title == "" {
+			return fmt.Errorf("использование: tt new --project ИМЯ --title ТЕКСТ [--priority high|medium|low] [--effort 2h] [--depends-on ID,ID] [--spec ПУТЬ]")
+		}
+		dir, err := cli.ResolveVault(*vaultFlag)
+		if err != nil {
+			return err
+		}
+		var deps []string
+		if *dependsOn != "" {
+			for _, id := range strings.Split(*dependsOn, ",") {
+				deps = append(deps, strings.TrimSpace(id))
+			}
+		}
+		return cli.New(os.Stdout, dir, taskop.NewOptions{
+			Project:   *project,
+			Title:     *title,
+			Priority:  *priority,
+			Effort:    *effort,
+			Spec:      *spec,
+			DependsOn: deps,
+		})
 
 	case "set":
 		fs := flag.NewFlagSet("set", flag.ExitOnError)

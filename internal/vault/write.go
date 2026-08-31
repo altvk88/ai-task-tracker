@@ -16,6 +16,25 @@ import (
 // Никакого round-trip через YAML-библиотеку: она переставила бы ключи и потеряла
 // пустые значения, превратив git-diff в мусор.
 func SetField(path, key, value string) error {
+	newLine := key + ":"
+	if value != "" {
+		newLine += " " + quote(value)
+	}
+	return setLine(path, key, newLine)
+}
+
+// SetFieldRaw переписывает ключ буквальным значением без квотирования —
+// нужен структурным значениям YAML вроде blocked_by: [TT-001, TT-002],
+// которые SetField превратил бы в квотированную строку (needsQuote реагирует
+// на ведущий "["). Механика замены строки та же самая, единственный писатель
+// в файл; отличается только то, что попадает в новую строку.
+func SetFieldRaw(path, key, raw string) error {
+	return setLine(path, key, key+": "+raw)
+}
+
+// setLine ищет ключ верхнего уровня во фронтматтере и заменяет его строку
+// (вместе со вложенным блоком, если он был) на newLine.
+func setLine(path, key, newLine string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -42,11 +61,6 @@ func SetField(path, key, value string) error {
 	}
 	if end < 0 {
 		return fmt.Errorf("%s: %w", path, ErrUnclosedFrontmatter)
-	}
-
-	newLine := key + ":"
-	if value != "" {
-		newLine += " " + quote(value)
 	}
 
 	out := make([]string, 0, len(lines)+1)
