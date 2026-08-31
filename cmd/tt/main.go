@@ -21,6 +21,7 @@ const usage = `tt — таск-трекер над markdown-vault
 
 Использование:
   tt list   [--vault ПУТЬ] [--project ИМЯ] [--status СТАТУС] [--json]
+  tt next   [--vault ПУТЬ] --project ИМЯ [--json]
   tt new    [--vault ПУТЬ] --project ИМЯ --title ТЕКСТ [--priority high|medium|low]
             [--effort 2h] [--depends-on ID,ID] [--spec ПУТЬ]
   tt set    [--vault ПУТЬ] [--agent ИМЯ] ID КЛЮЧ [ЗНАЧЕНИЕ]
@@ -65,6 +66,23 @@ func run(cmd string, args []string) error {
 			return err
 		}
 		return cli.List(os.Stdout, dir, cli.ListOptions{Project: *project, Status: *status, JSON: *asJSON})
+
+	case "next":
+		fs := flag.NewFlagSet("next", flag.ExitOnError)
+		vaultFlag := fs.String("vault", "", "путь к vault")
+		project := fs.String("project", "", "проект (обязателен)")
+		asJSON := fs.Bool("json", false, "вывод в JSON")
+		if err := fs.Parse(args); err != nil {
+			return err
+		}
+		if *project == "" {
+			return fmt.Errorf("использование: tt next --project ИМЯ [--json]")
+		}
+		dir, err := cli.ResolveVault(*vaultFlag)
+		if err != nil {
+			return err
+		}
+		return cli.Next(os.Stdout, dir, *project, *asJSON)
 
 	case "new":
 		fs := flag.NewFlagSet("new", flag.ExitOnError)
