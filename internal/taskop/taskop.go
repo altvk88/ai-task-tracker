@@ -93,27 +93,9 @@ func Set(vaultDir, id, key, value, agent string) (Result, error) {
 	if !writableFields[key] {
 		return Result{}, failf(KindBadValue, "поле %q не разрешено менять", key)
 	}
-	schema, err := model.LoadSchema(SchemaPath(vaultDir))
+	schema, byID, task, err := locate(vaultDir, id)
 	if err != nil {
-		return Result{}, failf(KindWrite, "%w", err)
-	}
-	tasks, err := vault.Scan(vaultDir)
-	if err != nil {
-		return Result{}, failf(KindWrite, "%w", err)
-	}
-	byID := vault.ByID(tasks)
-	task, ok := byID[id]
-	if !ok {
-		// Битая таска в индекс не попадает: её фронтматтер не разобрался, и ID
-		// из него не извлечён. Ищем по тексту, чтобы не отвечать «не найдена»
-		// на файл, который лежит на месте.
-		if broken, found := brokenWithID(tasks, id); found {
-			return Result{}, unparsable(id, broken.ParseErr)
-		}
-		return Result{}, failf(KindNotFound, "таска %s не найдена", id)
-	}
-	if task.ParseErr != "" {
-		return Result{}, unparsable(id, task.ParseErr)
+		return Result{}, err
 	}
 
 	if key != "status" {

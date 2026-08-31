@@ -20,7 +20,7 @@ func SetField(path, key, value string) error {
 	if value != "" {
 		newLine += " " + quote(value)
 	}
-	return setLine(path, key, newLine)
+	return setLines(path, key, []string{newLine})
 }
 
 // SetFieldRaw переписывает ключ буквальным значением без квотирования —
@@ -29,12 +29,31 @@ func SetField(path, key, value string) error {
 // на ведущий "["). Механика замены строки та же самая, единственный писатель
 // в файл; отличается только то, что попадает в новую строку.
 func SetFieldRaw(path, key, raw string) error {
-	return setLine(path, key, key+": "+raw)
+	return setLines(path, key, []string{key + ": " + raw})
 }
 
-// setLine ищет ключ верхнего уровня во фронтматтере и заменяет его строку
-// (вместе со вложенным блоком, если он был) на newLine.
-func setLine(path, key, newLine string) error {
+// SetBlock переписывает ключ вложенным блоком: строка "key:" и по строке на
+// каждое поле с отступом в два пробела. Значения квотируются так же, как в
+// SetField. Поля с пустым значением не пишутся вовсе: строка "  branch:" в
+// блоке читается как null и только зашумляет файл.
+//
+// Нужен claim'у — единственному ключу фронтматтера с вложенной структурой.
+// SetField писать его не умеет: он вложенный блок снимает, а не создаёт.
+// Гарантия та же самая — трогаются только строки этого ключа.
+func SetBlock(path, key string, fields [][2]string) error {
+	lines := []string{key + ":"}
+	for _, f := range fields {
+		if f[1] == "" {
+			continue
+		}
+		lines = append(lines, "  "+f[0]+": "+quote(f[1]))
+	}
+	return setLines(path, key, lines)
+}
+
+// setLines ищет ключ верхнего уровня во фронтматтере и заменяет его строку
+// (вместе со вложенным блоком, если он был) на newLines.
+func setLines(path, key string, newLines []string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -70,7 +89,7 @@ func setLine(path, key, newLine string) error {
 			out = append(out, lines[i])
 			continue
 		}
-		out = append(out, newLine)
+		out = append(out, newLines...)
 		replaced = true
 		// Пропускаем вложенный блок, принадлежавший этому ключу.
 		for i+1 < end && isIndented(lines[i+1]) {
@@ -79,7 +98,7 @@ func setLine(path, key, newLine string) error {
 	}
 	if !replaced {
 		// Ключа не было — вставляем последней строкой блока, перед закрывающим фенсом.
-		out = slices.Insert(out, end, newLine)
+		out = slices.Insert(out, end, newLines...)
 	}
 
 	var data bytes.Buffer

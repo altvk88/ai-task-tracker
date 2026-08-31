@@ -24,6 +24,9 @@ const usage = `tt — таск-трекер над markdown-vault
   tt new    [--vault ПУТЬ] --project ИМЯ --title ТЕКСТ [--priority high|medium|low]
             [--effort 2h] [--depends-on ID,ID] [--spec ПУТЬ]
   tt set    [--vault ПУТЬ] [--agent ИМЯ] ID КЛЮЧ [ЗНАЧЕНИЕ]
+  tt claim   [--vault ПУТЬ] [--agent ИМЯ] ID
+  tt release [--vault ПУТЬ] ID
+  tt reset   [--vault ПУТЬ] ID
   tt doctor [--vault ПУТЬ] [--fix]
   tt serve  [--vault ПУТЬ] [--port N] [--listen АДРЕС] [--agent ИМЯ] [--token ТОКЕН]
 
@@ -116,6 +119,35 @@ func run(cmd string, args []string) error {
 			return err
 		}
 		return cli.Set(os.Stdout, dir, rest[0], rest[1], value, *agent)
+
+	case "claim", "release", "reset":
+		fs := flag.NewFlagSet(cmd, flag.ExitOnError)
+		vaultFlag := fs.String("vault", "", "путь к vault")
+		// --agent осмыслен только у claim: release и reset снимают claim, а не
+		// пишут его. Регистрировать флаг у них — обещать влияние, которого нет.
+		agent := new(string)
+		if cmd == "claim" {
+			agent = fs.String("agent", "cli", "имя агента, который берёт таску")
+		}
+		if err := fs.Parse(args); err != nil {
+			return err
+		}
+		rest := fs.Args()
+		if len(rest) != 1 {
+			return fmt.Errorf("использование: tt %s ID", cmd)
+		}
+		dir, err := cli.ResolveVault(*vaultFlag)
+		if err != nil {
+			return err
+		}
+		switch cmd {
+		case "claim":
+			return cli.Claim(os.Stdout, dir, rest[0], *agent)
+		case "release":
+			return cli.Release(os.Stdout, dir, rest[0])
+		default:
+			return cli.Reset(os.Stdout, dir, rest[0])
+		}
 
 	case "doctor":
 		fs := flag.NewFlagSet("doctor", flag.ExitOnError)

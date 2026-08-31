@@ -196,3 +196,90 @@ func TestSetFieldRejectsFileWithoutFrontmatter(t *testing.T) {
 		t.Fatal("файл без фронтматтера обязан давать ошибку, а не получать новый блок")
 	}
 }
+
+// withoutClaimBlock убирает из текста строку claim: со вложенным блоком —
+// остаток обязан совпасть с исходным файлом байт в байт, иначе SetBlock
+// тронул чужие строки.
+func withoutClaimBlock(text string) string {
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines))
+	for i := 0; i < len(lines); i++ {
+		if strings.HasPrefix(lines[i], "claim:") {
+			for i+1 < len(lines) && strings.HasPrefix(lines[i+1], "  ") {
+				i++
+			}
+			continue
+		}
+		out = append(out, lines[i])
+	}
+	return strings.Join(out, "\n")
+}
+
+func TestSetBlockTouchesOnlyItsOwnKey(t *testing.T) {
+	p := writeTemp(t, sampleTask)
+	fields := [][2]string{{"agent", "claude"}, {"host", "WORKSTATION"}, {"branch", "main"}, {"started", "2026-09-01"}}
+	if err := SetBlock(p, "claim", fields); err != nil {
+		t.Fatalf("SetBlock: %v", err)
+	}
+	after, _ := os.ReadFile(p)
+	want := "claim:\n  agent: claude\n  host: WORKSTATION\n  branch: main\n  started: 2026-09-01\n"
+	if !strings.Contains(string(after), want) {
+		t.Fatalf("блок claim записан не в живом формате:\n%s", after)
+	}
+	if got := withoutClaimBlock(string(after)); got != withoutClaimBlock(sampleTask) {
+		t.Fatalf("тронуты строки за пределами claim:\n%s", got)
+	}
+}
+
+func TestSetBlockReplacesExistingBlock(t *testing.T) {
+	p := writeTemp(t, sampleTask)
+	old := [][2]string{{"agent", "old"}, {"host", "H"}, {"branch", "b"}, {"started", "2026-01-01"}}
+	if err := SetBlock(p, "claim", old); err != nil {
+		t.Fatal(err)
+	}
+	fresh := [][2]string{{"agent", "claude"}, {"host", "H2"}, {"branch", "main"}, {"started", "2026-09-01"}}
+	if err := SetBlock(p, "claim", fresh); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := os.ReadFile(p)
+	if strings.Contains(string(after), "agent: old") {
+		t.Errorf("старый блок не заменён, а продублирован:\n%s", after)
+	}
+	if n := strings.Count(string(after), "claim:"); n != 1 {
+		t.Errorf("ключ claim встречается %d раз", n)
+	}
+	if got := withoutClaimBlock(string(after)); got != withoutClaimBlock(sampleTask) {
+		t.Fatalf("тронуты строки за пределами claim:\n%s", got)
+	}
+}
+
+func TestSetBlockSkipsEmptyFields(t *testing.T) {
+	p := writeTemp(t, sampleTask)
+	fields := [][2]string{{"agent", "claude"}, {"host", ""}, {"branch", ""}, {"started", "2026-09-01"}}
+	if err := SetBlock(p, "claim", fields); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := os.ReadFile(p)
+	if strings.Contains(string(after), "branch:") {
+		t.Errorf("пустое поле блока не должно писаться:\n%s", after)
+	}
+}
+
+func TestSetBlockPreservesCRLFAndBOM(t *testing.T) {
+	crlf := "\ufeff" + strings.ReplaceAll(sampleTask, "\n", "\r\n")
+	p := writeTemp(t, crlf)
+	fields := [][2]string{{"agent", "claude"}, {"started", "2026-09-01"}}
+	if err := SetBlock(p, "claim", fields); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := os.ReadFile(p)
+	if !strings.HasPrefix(string(after), "\ufeff") {
+		t.Error("BOM потерян")
+	}
+	if strings.Contains(strings.ReplaceAll(string(after), "\r\n", ""), "\n") {
+		t.Error("часть переводов строк осталась без \r — файл стал смешанным")
+	}
+	if !strings.Contains(string(after), "claim:\r\n  agent: claude\r\n  started: 2026-09-01\r\n") {
+		t.Errorf("блок записан не с CRLF:\n%q", string(after))
+	}
+}
