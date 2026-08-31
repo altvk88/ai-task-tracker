@@ -27,6 +27,7 @@ const usage = `tt — таск-трекер над markdown-vault
   tt claim   [--vault ПУТЬ] [--agent ИМЯ] ID
   tt release [--vault ПУТЬ] ID
   tt reset   [--vault ПУТЬ] ID
+  tt done    [--vault ПУТЬ] [--agent ИМЯ] [--result ТЕКСТ] ID
   tt doctor [--vault ПУТЬ] [--fix]
   tt serve  [--vault ПУТЬ] [--port N] [--listen АДРЕС] [--agent ИМЯ] [--token ТОКЕН]
 
@@ -148,6 +149,24 @@ func run(cmd string, args []string) error {
 		default:
 			return cli.Reset(os.Stdout, dir, rest[0])
 		}
+
+	case "done":
+		fs := flag.NewFlagSet("done", flag.ExitOnError)
+		vaultFlag := fs.String("vault", "", "путь к vault")
+		agent := fs.String("agent", "cli", "имя агента для проверки claim")
+		result := fs.String("result", "", "текст поля result")
+		if err := fs.Parse(args); err != nil {
+			return err
+		}
+		rest := fs.Args()
+		if len(rest) != 1 {
+			return fmt.Errorf("использование: tt done [--result ТЕКСТ] ID")
+		}
+		dir, err := cli.ResolveVault(*vaultFlag)
+		if err != nil {
+			return err
+		}
+		return cli.Done(os.Stdout, dir, rest[0], *result, *agent)
 
 	case "doctor":
 		fs := flag.NewFlagSet("doctor", flag.ExitOnError)
