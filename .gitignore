@@ -1,3 +1,11 @@
 /tt.exe
 /tt
 /dist/
+
+# Веб-бандл: собирается из web/*.svelte в web/dist через npm run build.
+# В git — только заглушки (.gitkeep, минимальный index.html), чтобы go:embed
+# не падал на чистом клоне без собранного фронта. См. web/embed.go и README.
+/web/node_modules/
+/web/dist/*
+!/web/dist/.gitkeep
+!/web/dist/index.html

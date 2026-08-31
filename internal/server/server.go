@@ -50,10 +50,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/task/{id}", s.handleTask)
 	mux.HandleFunc("/api/task/{id}/status", s.handleSetStatus)
 	mux.HandleFunc("/api/events", s.handleEvents)
-	mux.HandleFunc("/", handleNotFound)
+	mux.HandleFunc("/api/", handleAPINotFound)
+	mux.Handle("/", staticHandler())
 	return mux
 }
 
-func handleNotFound(w http.ResponseWriter, r *http.Request) {
+// handleAPINotFound — неизвестный маршрут внутри /api/*. Контракт API требует
+// JSON на любую ошибку, в отличие от статики на "/", которая отдаёт HTML.
+func handleAPINotFound(w http.ResponseWriter, r *http.Request) {
 	writeError(w, http.StatusNotFound, "маршрут не найден")
 }
