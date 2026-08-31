@@ -13,6 +13,7 @@ const usage = `tt — таск-трекер над markdown-vault
 
 Использование:
   tt list [--vault ПУТЬ] [--project ИМЯ] [--status СТАТУС] [--json]
+  tt set  [--vault ПУТЬ] [--agent ИМЯ] ID КЛЮЧ [ЗНАЧЕНИЕ]
 
 Путь к vault берётся из --vault, иначе из переменной TT_VAULT.
 `
@@ -44,6 +45,27 @@ func run(cmd string, args []string) error {
 			return err
 		}
 		return cli.List(os.Stdout, dir, cli.ListOptions{Project: *project, Status: *status, JSON: *asJSON})
+
+	case "set":
+		fs := flag.NewFlagSet("set", flag.ExitOnError)
+		vaultFlag := fs.String("vault", "", "путь к vault")
+		agent := fs.String("agent", "cli", "имя агента для проверки claim")
+		if err := fs.Parse(args); err != nil {
+			return err
+		}
+		rest := fs.Args()
+		if len(rest) < 2 {
+			return fmt.Errorf("использование: tt set ID КЛЮЧ [ЗНАЧЕНИЕ]")
+		}
+		value := ""
+		if len(rest) > 2 {
+			value = rest[2]
+		}
+		dir, err := cli.ResolveVault(*vaultFlag)
+		if err != nil {
+			return err
+		}
+		return cli.Set(os.Stdout, dir, rest[0], rest[1], value, *agent)
 
 	case "help", "--help", "-h":
 		fmt.Print(usage)
