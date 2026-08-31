@@ -5,13 +5,19 @@ package server
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/alkulagin-creator/tt/internal/index"
 )
 
-// Options — параметры сервера. Пока пусто: токен и адрес слушателя появятся
-// в следующих задачах, когда до них дойдёт дело (`tt serve`).
-type Options struct{}
+// Options — параметры сервера. Токен и адрес слушателя появятся в следующих
+// задачах, когда до них дойдёт дело (`tt serve`).
+type Options struct {
+	// HeartbeatInterval — период SSE-пульса на /api/events. Ноль или
+	// отрицательное значение — использовать defaultHeartbeat. Настраиваемо,
+	// иначе тесты ждали бы реальные 30 секунд.
+	HeartbeatInterval time.Duration
+}
 
 // Server отдаёт снимок vault и отдельные таски по HTTP.
 type Server struct {
@@ -34,6 +40,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/snapshot", s.handleSnapshot)
 	mux.HandleFunc("/api/task/{id}", s.handleTask)
+	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/", handleNotFound)
 	return mux
 }
