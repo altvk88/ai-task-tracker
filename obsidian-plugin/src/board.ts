@@ -1,6 +1,8 @@
 import { ItemView, type WorkspaceLeaf, TFile, Notice } from "obsidian";
-import { type Schema, parseSchema } from "./schema.ts";
+import { type Schema, parseSchema, normalize } from "./schema.ts";
 import { toTask, buildLanes, type Task, type Lane } from "./lanes.ts";
+import { checkTransition } from "./guards.ts";
+import { isLocked, applyStatus } from "./write.ts";
 
 export const VIEW_TYPE_TT_BOARD = "tt-board";
 
@@ -146,8 +148,102 @@ export class BoardView extends ItemView {
 
     // Клик открывает файл таски рядом — нативная сила Obsidian, которой не будет у веб-доски.
     card.onclick = () => {
+      if (card.dataset.dragged === "1") {
+        delete card.dataset.dragged;
+        return;
+      }
       const file = this.app.vault.getAbstractFileByPath(t.path);
       if (file instanceof TFile) void this.app.workspace.getLeaf("split").openFile(file);
     };
+
+    this.makeDraggable(card, t.path);
+  }
+
+  /** Перетаскивание на pointer-событиях: работает и мышью, и пальцем. */
+  private makeDraggable(card: HTMLElement, path: string): void {
+    card.onpointerdown = (down: PointerEvent) => {
+      if (down.button !== 0) return;
+      // Флаг мог остаться от прошлого жеста, завершившегося без click (pointercancel):
+      // иначе следующий честный клик по карточке был бы съеден.
+      delete card.dataset.dragged;
+      const startX = down.clientX;
+      const startY = down.clientY;
+      let ghost: HTMLElement | null = null;
+      let target: HTMLElement | null = null;
+
+      const move = (ev: PointerEvent): void => {
+        if (!ghost) {
+          // Порог в 5 пикселей отделяет перетаскивание от клика.
+          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
+          card.addClass("tt-dragging");
+          ghost = card.cloneNode(true) as HTMLElement;
+          ghost.addClass("tt-drag-ghost");
+          document.body.appendChild(ghost);
+          card.setPointerCapture(down.pointerId);
+        }
+        ghost.style.left = `${ev.clientX - 100}px`;
+        ghost.style.top = `${ev.clientY - 16}px`;
+
+        const under = document.elementFromPoint(ev.clientX, ev.clientY);
+        const lane = (under?.closest(".tt-lane") ?? null) as HTMLElement | null;
+        if (lane !== target) {
+          target?.removeClass("tt-drop-target");
+          target = lane;
+          target?.addClass("tt-drop-target");
+        }
+      };
+
+      const up = (): void => {
+        card.onpointermove = null;
+        card.onpointerup = null;
+        card.onpointercancel = null;
+        card.removeClass("tt-dragging");
+        const dragged = ghost !== null;
+        ghost?.remove();
+        ghost = null;
+        target?.removeClass("tt-drop-target");
+        const to = target?.dataset.status;
+        target = null;
+        if (dragged) {
+          // Браузер шлёт click после отпускания — гасим его, иначе откроется файл.
+          card.dataset.dragged = "1";
+          if (to) void this.moveTask(path, to);
+        }
+      };
+
+      card.onpointermove = move;
+      card.onpointerup = up;
+      card.onpointercancel = up;
+    };
+  }
+
+  /** Переносит таску в другой статус со всеми проверками. Вызывается из drag-and-drop. */
+  private async moveTask(path: string, to: string): Promise<void> {
+    if (!this.schema) return;
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return;
+
+    const tasks = this.collect();
+    const byId = new Map(tasks.filter((t) => t.id).map((t) => [t.id, t]));
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    const task = toTask(path, fm as Record<string, unknown>);
+
+    const from = normalize(this.schema, task.status).id;
+    const target = normalize(this.schema, to).id;
+    if (from === target) return;
+
+    const locked = await isLocked(this.app, task.id);
+    const err = checkTransition(this.schema, task, target, byId, locked);
+    if (err) {
+      new Notice(err);
+      this.render();
+      return;
+    }
+    try {
+      await applyStatus(this.app, this.schema, file, task.id, from, target);
+    } catch (e) {
+      new Notice(`не удалось записать: ${(e as Error).message}`);
+      this.render();
+    }
   }
 }
