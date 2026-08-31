@@ -3,6 +3,8 @@
 // компонентам готовые лейны. Компоненты в сеть не ходят.
 import { writable, derived, get } from 'svelte/store';
 import { applyChange, startLive } from './live.js';
+import { normalizeStatus } from './status.js';
+import { computePulse } from './pulse.js';
 
 // Раскладка по лейнам скопирована по смыслу с obsidian-plugin/src/lanes.ts —
 // тот же порядок статусов, те же правила для пустых и неизвестных лейнов.
@@ -47,14 +49,6 @@ function authHeaders() {
   } catch {
     return {};
   }
-}
-
-/** Приводит написание статуса к каноническому по схеме сервера. */
-function normalizeStatus(schema, status) {
-  const v = (status ?? '').trim().toLowerCase();
-  if (v === '') return '';
-  const canon = schema.aliases?.[v] ?? v;
-  return schema.statuses.some((st) => st.id === canon) ? canon : (status ?? '').trim();
 }
 
 /** Подпись лейна; для неизвестного статуса — сам статус, чтобы таска была видна. */
@@ -111,8 +105,9 @@ export const projects = derived(snapshot, ($snapshot) =>
 
 // Таски по id — по ПОЛНОМУ снимку, а не по отфильтрованному подмножеству:
 // блокер может лежать в другом проекте, который сейчас скрыт фильтром, но
-// это не делает его снятым.
-const tasksById = derived(snapshot, ($snapshot) => {
+// это не делает его снятым. Экспортирован — панель таски (TT-035) ищет по
+// нему и саму выбранную таску, и её блокеров.
+export const tasksById = derived(snapshot, ($snapshot) => {
   const map = new Map();
   for (const t of $snapshot.tasks) if (t.id) map.set(t.id, t);
   return map;
@@ -204,8 +199,17 @@ export function dismissNotice() {
 
 // --- Смена статуса ------------------------------------------------------
 
-/** ID выбранной карточки. Панель таски — TT-035; пока это только подсветка. */
+/** ID выбранной карточки — по ней TaskPanel открывает боковую панель. */
 export const selectedId = writable('');
+
+// --- Переключатель «доска / пульс» (TT-035) ------------------------------
+
+export const view = writable('board');
+
+/** Сводка для страницы «Пульс», посчитанная из уже загруженного снимка. */
+export const pulseData = derived(snapshot, ($snapshot) =>
+  $snapshot.schema ? computePulse($snapshot.tasks, $snapshot.schema) : null
+);
 
 /**
  * Переносит таску в другой статус. Карточка переезжает сразу, запрос уходит

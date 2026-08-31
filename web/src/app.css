@@ -270,3 +270,235 @@ h1 {
   background: var(--busy-bg);
   color: var(--busy-fg);
 }
+
+/* Вкладки «Доска / Пульс» */
+
+.view-tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.view-tabs button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.view-tabs button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Пульс */
+
+.pulse {
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  overflow-y: auto;
+  height: calc(100vh - 3.5rem);
+  box-sizing: border-box;
+  align-content: start;
+}
+
+.pulse-block {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+
+.pulse-block h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.pulse-count {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.pulse-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.pulse-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.pulse-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.pulse-muted {
+  color: var(--muted);
+}
+
+.pulse-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pulse-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.pulse-table td {
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pulse-num {
+  text-align: right;
+  color: var(--muted);
+}
+
+/* Боковая панель таски */
+
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 35%);
+  z-index: 40;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.panel {
+  width: min(28rem, 100vw);
+  height: 100%;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.panel-id {
+  font-weight: 600;
+}
+
+.panel-project {
+  color: var(--muted);
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.panel-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.panel-title {
+  font-size: 1.05rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.panel-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.panel-fields dt {
+  color: var(--muted);
+}
+
+.panel-fields dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.panel-path {
+  font-family: monospace;
+  font-size: 0.78rem;
+}
+
+.panel-section {
+  margin-bottom: 1rem;
+}
+
+.panel-section h3 {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0 0 0.35rem;
+}
+
+.panel-status {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.panel-status.error {
+  color: var(--priority-high);
+}
+
+.blockers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.blocker {
+  font-size: 0.78rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  background: var(--lane-bg);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.blocker.live {
+  border-color: var(--priority-high);
+  color: var(--priority-high);
+}
+
+.panel-raw {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  font-size: 0.78rem;
+  background: var(--lane-bg);
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 0;
+}
