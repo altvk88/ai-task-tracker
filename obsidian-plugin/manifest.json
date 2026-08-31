@@ -1,0 +1,9 @@
+{
+  "id": "tt-board",
+  "name": "TT Board",
+  "version": "0.1.0",
+  "minAppVersion": "1.0.0",
+  "description": "Канбан-доска задач прямо из фронтматтера, без файлов досок",
+  "author": "alexk",
+  "isDesktopOnly": false
+}
