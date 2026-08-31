@@ -112,3 +112,39 @@ func TestListFilters(t *testing.T) {
 		}
 	})
 }
+
+// Таблица обязана держать контракт «одна таска — одна строка»: многострочная
+// ошибка yaml.v3 иначе разваливает вывод, и его не разобрать ни глазами,
+// ни скриптом. А у битой таски пустой id, поэтому строка без имени файла
+// не позволяет понять, что именно чинить.
+func TestListTableKeepsOneLinePerTask(t *testing.T) {
+	root := fixtureVault(t)
+	broken := filepath.Join(root, "tasks", "alpha", "multiline-error.md")
+	// Дубль ключа даёт многострочную ошибку: "yaml: unmarshal errors:\n  line N: ..."
+	body := "---\nid: ALP-9\ntitle: битая\nstatus: ready\nproject: alpha\npriority: low\ncompleted:\ncompleted:\n---\n"
+	if err := os.WriteFile(broken, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	noID := filepath.Join(root, "tasks", "alpha", "no-id.md")
+	if err := os.WriteFile(noID, []byte("---\ntitle: Баг (прод): всё сломалось\nstatus: ready\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	if err := List(&buf, root, ListOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	out := strings.TrimRight(buf.String(), "\n")
+	lines := strings.Split(out, "\n")
+	if len(lines) != 6 {
+		t.Fatalf("строк в выводе %d, ожидалось 6 (4 целых + 2 битых):\n%s", len(lines), out)
+	}
+	for i, l := range lines {
+		if strings.HasPrefix(l, " ") {
+			t.Errorf("строка %d начинается с отступа — это обрывок многострочной ошибки: %q", i+1, l)
+		}
+	}
+	if !strings.Contains(out, "no-id.md") {
+		t.Errorf("у таски без id не показано имя файла, её нечем опознать:\n%s", out)
+	}
+}

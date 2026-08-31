@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/alkulagin-creator/tt/internal/model"
@@ -77,9 +79,23 @@ func List(w io.Writer, vaultDir string, opt ListOptions) error {
 	for _, r := range rows {
 		title := r.Title
 		if r.ParseErr != "" {
-			title = "BROKEN: " + r.ParseErr
+			title = "BROKEN: " + oneLine(r.ParseErr)
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", r.ID, r.Status, r.Project, r.Priority, title)
+		// У битой таски id не разобрался, и строка без опознавательных знаков
+		// бесполезна — показываем имя файла, по нему её можно найти и починить.
+		id := r.ID
+		if id == "" {
+			id = filepath.Base(r.Path)
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", id, r.Status, r.Project, r.Priority, title)
 	}
 	return tw.Flush()
+}
+
+// oneLine сжимает многострочный текст в одну строку. Ошибки yaml.v3 бывают
+// многострочными ("unmarshal errors:\n  line 21: ..."), и без этого таблица
+// теряет контракт «одна таска — одна строка»: её не разобрать ни глазами,
+// ни скриптом.
+func oneLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
