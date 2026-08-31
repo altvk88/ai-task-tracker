@@ -135,7 +135,11 @@ func TestSnapshot_схемаСохраняетПорядокЛейнов(t *test
 func TestSnapshot_методНеПоддерживается(t *testing.T) {
 	srv, _ := newTestServer(t)
 	rr := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/snapshot", nil))
+	// RemoteAddr — loopback: тест проверяет 405 на неверный метод, а не 401
+	// авторизации (у неё дефолтный httptest.NewRequest адрес не loopback).
+	req := httptest.NewRequest(http.MethodPost, "/api/snapshot", nil)
+	req.RemoteAddr = "127.0.0.1:1"
+	srv.Handler().ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("код = %d, ожидался 405", rr.Code)
@@ -186,7 +190,11 @@ func TestTask_несуществующийID(t *testing.T) {
 func TestTask_методНеПоддерживается(t *testing.T) {
 	srv, _ := newTestServer(t)
 	rr := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/task/DEMO-001", nil))
+	// RemoteAddr — loopback: тест проверяет 405 на неверный метод, а не 401
+	// авторизации (у неё дефолтный httptest.NewRequest адрес не loopback).
+	req := httptest.NewRequest(http.MethodPost, "/api/task/DEMO-001", nil)
+	req.RemoteAddr = "127.0.0.1:1"
+	srv.Handler().ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("код = %d, ожидался 405, тело: %s", rr.Code, rr.Body.String())

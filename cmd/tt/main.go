@@ -21,7 +21,7 @@ const usage = `tt — таск-трекер над markdown-vault
   tt list   [--vault ПУТЬ] [--project ИМЯ] [--status СТАТУС] [--json]
   tt set    [--vault ПУТЬ] [--agent ИМЯ] ID КЛЮЧ [ЗНАЧЕНИЕ]
   tt doctor [--vault ПУТЬ] [--fix]
-  tt serve  [--vault ПУТЬ] [--port N] [--listen АДРЕС] [--agent ИМЯ]
+  tt serve  [--vault ПУТЬ] [--port N] [--listen АДРЕС] [--agent ИМЯ] [--token ТОКЕН]
 
 Путь к vault берётся из --vault, иначе из переменной TT_VAULT.
 `
@@ -99,6 +99,7 @@ func run(cmd string, args []string) error {
 		port := fs.Int("port", defaultServePort, "порт, если не задан --listen")
 		listen := fs.String("listen", "", "адрес слушателя (host:port); по умолчанию localhost:--port")
 		agent := fs.String("agent", "", "имя писателя для смены статусов из веба")
+		token := fs.String("token", "", "токен на запись для запросов не с loopback-адреса; не задан — сгенерируется")
 		if err := fs.Parse(args); err != nil {
 			return err
 		}
@@ -111,9 +112,17 @@ func run(cmd string, args []string) error {
 			addr = net.JoinHostPort("localhost", fmt.Sprint(*port))
 		}
 
+		tok := *token
+		if tok == "" {
+			tok, err = server.GenerateToken()
+			if err != nil {
+				return fmt.Errorf("не удалось сгенерировать токен: %w", err)
+			}
+		}
+
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
-		return serve(ctx, dir, addr, *agent)
+		return serve(ctx, dir, addr, *agent, tok)
 
 	case "help", "--help", "-h":
 		fmt.Print(usage)
@@ -129,7 +138,7 @@ func run(cmd string, args []string) error {
 // импортировал бы internal/server, а тесты internal/server уже импортируют
 // internal/cli (для подготовки фикстур через cli.Set) — получился бы цикл.
 // Тот же выбор направления зависимостей объяснён в internal/index/index.go.
-func serve(ctx context.Context, vaultDir, addr, agent string) error {
+func serve(ctx context.Context, vaultDir, addr, agent, token string) error {
 	ix, err := index.New(vaultDir)
 	if err != nil {
 		return err
@@ -145,10 +154,15 @@ func serve(ctx context.Context, vaultDir, addr, agent string) error {
 		return fmt.Errorf("не удалось занять адрес %s: %w", addr, err)
 	}
 
-	srv := server.New(ix, vaultDir, server.Options{Agent: agent})
+	srv := server.New(ix, vaultDir, server.Options{Agent: agent, Token: token})
 	httpSrv := &http.Server{Handler: srv.Handler()}
 
+	// Токен печатается один раз, здесь и только здесь: другого способа его
+	// узнать нет (в логи и в файлы vault он не пишется), а ссылка с
+	// ?token= позволяет открыть доску с телефона одним касанием.
 	fmt.Printf("tt serve: http://%s\n", ln.Addr())
+	fmt.Printf("токен на запись (для доступа не с этого компьютера): %s\n", token)
+	fmt.Printf("ссылка с токеном: http://%s/?token=%s\n", ln.Addr(), token)
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- httpSrv.Serve(ln) }()

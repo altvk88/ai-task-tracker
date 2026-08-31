@@ -13,6 +13,42 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const OLD_CLOSED_DAYS = 14;
 const CLOSED_STATUSES = new Set(['done', 'cancelled']);
 
+// --- Токен на запись (TT-031) --------------------------------------------
+//
+// Сервер требует токен на запись только для запросов не с loopback-адреса —
+// то есть именно для случая "открыл доску с телефона по ссылке". Ссылка
+// содержит ?token=…; чтобы не таскать параметр по URL при каждом переходе
+// внутри SPA, токен один раз сохраняется в sessionStorage (переживает
+// перезагрузку той же вкладки, но не расшаривается на другие вкладки и не
+// улетает на сервер как часть истории браузера дольше, чем нужно) и сразу
+// вычищается из адресной строки.
+const TOKEN_KEY = 'tt-write-token';
+
+function captureTokenFromURL() {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get('token');
+  if (!token) return;
+  try {
+    sessionStorage.setItem(TOKEN_KEY, token);
+    url.searchParams.delete('token');
+    window.history.replaceState(null, '', url);
+  } catch {
+    // Приватный режим и т.п. может запрещать sessionStorage — доска в этом
+    // случае просто останется без сохранённого токена между переходами.
+  }
+}
+captureTokenFromURL();
+
+/** Заголовок Authorization для fetch, если токен когда-либо был получен. */
+function authHeaders() {
+  try {
+    const token = sessionStorage.getItem(TOKEN_KEY);
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 /** Приводит написание статуса к каноническому по схеме сервера. */
 function normalizeStatus(schema, status) {
   const v = (status ?? '').trim().toLowerCase();
@@ -187,7 +223,7 @@ export async function moveTask(id, to) {
   try {
     const res = await fetch(`/api/task/${encodeURIComponent(id)}/status`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ to }),
     });
     const data = await res.json().catch(() => null);

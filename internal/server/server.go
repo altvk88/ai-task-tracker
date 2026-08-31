@@ -22,6 +22,11 @@ type Options struct {
 	// defaultAgent. Оно сравнивается с claim таски, поэтому веб не должен
 	// притворяться bash-агентом: чужую занятую таску забирать нельзя.
 	Agent string
+
+	// Token — токен на запись для запросов не с loopback-адреса (см.
+	// auth.go). Пусто — проверка токена отключена целиком: так живёт
+	// большинство тестов пакета, которым авторизация не по теме.
+	Token string
 }
 
 // defaultAgent — под этим именем пишет веб-клиент, если не задано иное.
@@ -52,7 +57,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/", handleAPINotFound)
 	mux.Handle("/", staticHandler())
-	return mux
+	return s.authMiddleware(mux)
 }
 
 // handleAPINotFound — неизвестный маршрут внутри /api/*. Контракт API требует

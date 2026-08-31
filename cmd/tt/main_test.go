@@ -21,7 +21,7 @@ func TestServeGracefulShutdown(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- serve(ctx, vaultDir, "127.0.0.1:0", "web") }()
+	go func() { done <- serve(ctx, vaultDir, "127.0.0.1:0", "web", "тест-токен") }()
 
 	// Дать serve время подняться, прежде чем просить его остановиться.
 	time.Sleep(100 * time.Millisecond)
