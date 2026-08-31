@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "statuses": [
+    { "id": "backlog",     "lane": "Backlog" },
+    { "id": "ready",       "lane": "Ready", "agentPickable": true },
+    { "id": "in-progress", "lane": "In Progress" },
+    { "id": "needs-input", "lane": "Needs Input" },
+    { "id": "blocked",     "lane": "Blocked" },
+    { "id": "hold",        "lane": "Hold" },
+    { "id": "failed",      "lane": "Failed" },
+    { "id": "done",        "lane": "Done" },
+    { "id": "cancelled",   "lane": "Canceled" },
+    { "id": "todo",        "lane": "Todo (legacy)" }
+  ],
+  "aliases": {
+    "in_progress": "in-progress",
+    "inprogress": "in-progress",
+    "needs_input": "needs-input",
+    "needsinput": "needs-input",
+    "canceled": "cancelled",
+    "on-hold": "hold",
+    "on_hold": "hold",
+    "onhold": "hold"
+  },
+  "clearsClaim": ["backlog", "ready", "needs-input", "blocked", "hold", "failed", "done", "cancelled", "todo"],
+  "setsCompleted": ["done"],
+  "setsReadyAt": ["ready"],
+  "promoteFrom": "backlog",
+  "promoteTo": "ready"
+}
