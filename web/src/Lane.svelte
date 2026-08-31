@@ -4,7 +4,7 @@
   let { laneData } = $props();
 </script>
 
-<div class="lane">
+<div class="lane" data-status={laneData.status}>
   <div class="lane-head">
     <span class="lane-title">{laneData.lane}</span>
     <span class="lane-count">{laneData.tasks.length}</span>

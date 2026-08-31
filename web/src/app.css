@@ -66,6 +66,39 @@ h1 {
   color: var(--priority-high);
 }
 
+/* Уведомление об отказе. Поверх доски, а не в потоке: иначе его появление
+   сдвигало бы лейны под курсором сразу после броска. */
+
+.notice {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 20;
+  max-width: min(90vw, 40rem);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  background: var(--card-bg);
+  color: var(--fg);
+  border: 1px solid var(--priority-high);
+  border-left-width: 4px;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 25%);
+}
+
+.notice button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
 /* Тулбар */
 
 .toolbar {
@@ -159,6 +192,35 @@ h1 {
   border-radius: 4px;
   padding: 0.4rem 0.55rem;
   font-size: 0.8rem;
+  /* Без этого браузер на тачскрине заберёт жест себе как прокрутку и
+     pointermove до карточки не дойдёт. */
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.card.selected {
+  outline: 2px solid var(--accent);
+}
+
+/* Оригинал во время переноса остаётся на месте бледной тенью — так видно,
+   откуда карточка уехала. */
+.card.dragging {
+  opacity: 0.4;
+}
+
+.card.drag-ghost {
+  position: fixed;
+  width: 200px;
+  z-index: 30;
+  opacity: 0.9;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
+  /* Иначе elementFromPoint под курсором находил бы саму копию, а не лейн. */
+  pointer-events: none;
+}
+
+.lane.drop-target {
+  outline: 2px solid var(--accent);
 }
 
 .card[data-priority='high'] {

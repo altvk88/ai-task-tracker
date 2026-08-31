@@ -1,10 +1,8 @@
-// Единственный источник данных для доски: ходит за снимком, хранит его и
-// фильтры, отдаёт компонентам готовые лейны. Компоненты в сеть не ходят.
-//
-// SSE (`/api/events`) сюда не подключаем — это TT-034. Но состояние уже
-// собрано в такой снимок-подобный объект, чтобы патч от сервера потом просто
-// заменил/добавил таску в `snapshot.tasks`, не переделывая ничего вокруг.
-import { writable, derived } from 'svelte/store';
+// Единственный источник данных для доски: ходит за снимком и за сменой
+// статуса, держит подписку на `/api/events`, хранит фильтры и отдаёт
+// компонентам готовые лейны. Компоненты в сеть не ходят.
+import { writable, derived, get } from 'svelte/store';
+import { applyChange, startLive } from './live.js';
 
 // Раскладка по лейнам скопирована по смыслу с obsidian-plugin/src/lanes.ts —
 // тот же порядок статусов, те же правила для пустых и неизвестных лейнов.
@@ -114,15 +112,93 @@ export const lanes = derived([snapshot, visibleTasks], ([$snapshot, $visible]) =
   $snapshot.schema ? buildLanes($snapshot.schema, $visible) : []
 );
 
-/** Загружает снимок с сервера. Вызывается один раз при монтировании App. */
+/**
+ * Загружает снимок с сервера: при монтировании App и повторно на resync.
+ * «Загрузка…» показывается только пока доски ещё нет — иначе каждый resync
+ * гасил бы её на время запроса.
+ */
 export async function loadSnapshot() {
-  snapshot.update((s) => ({ ...s, loading: true, error: '' }));
+  snapshot.update((s) => ({ ...s, loading: !s.schema, error: '' }));
   try {
     const res = await fetch('/api/snapshot');
     if (!res.ok) throw new Error(`сервер ответил ${res.status}`);
     const data = await res.json();
     snapshot.set({ tasks: data.tasks, schema: data.schema, summary: data.summary, loading: false, error: '' });
   } catch (err) {
-    snapshot.update((s) => ({ ...s, loading: false, error: String(err) }));
+    // Первая загрузка провалилась — показываем ошибку вместо доски. Повторная
+    // — доска на экране остаётся (пусть и устаревшая), ошибка уходит в
+    // уведомление: пустой экран вместо данных здесь хуже, чем старые данные.
+    if (get(snapshot).schema) showNotice(`не удалось обновить снимок: ${err.message}`);
+    else snapshot.update((s) => ({ ...s, loading: false, error: String(err) }));
   }
+}
+
+// --- Живое обновление ---------------------------------------------------
+
+/** Подписывается на поток изменений. Возвращает функцию остановки. */
+export function startLiveUpdates() {
+  return startLive({
+    createSource: (url) => new EventSource(url),
+    onChange: (change) => snapshot.update((s) => ({ ...s, tasks: applyChange(s.tasks, change) })),
+    onResync: () => void loadSnapshot(),
+  });
+}
+
+// --- Уведомления --------------------------------------------------------
+
+/** Текст последнего отказа; пусто — показывать нечего. */
+export const notice = writable('');
+
+// Отказ должен успеть прочитаться, поэтому уведомление живёт заметно дольше
+// обычного тоста и в любом случае закрывается кнопкой.
+const NOTICE_MS = 12000;
+let noticeTimer = null;
+
+export function showNotice(text) {
+  if (noticeTimer !== null) clearTimeout(noticeTimer);
+  notice.set(text);
+  noticeTimer = setTimeout(dismissNotice, NOTICE_MS);
+}
+
+export function dismissNotice() {
+  if (noticeTimer !== null) clearTimeout(noticeTimer);
+  noticeTimer = null;
+  notice.set('');
+}
+
+// --- Смена статуса ------------------------------------------------------
+
+/** ID выбранной карточки. Панель таски — TT-035; пока это только подсветка. */
+export const selectedId = writable('');
+
+/**
+ * Переносит таску в другой статус. Карточка переезжает сразу, запрос уходит
+ * следом; отказ (409 от правил флоу, 500 от записи) возвращает её на место и
+ * показывает причину.
+ */
+export async function moveTask(id, to) {
+  const state = get(snapshot);
+  const task = state.tasks.find((t) => t.id === id);
+  if (!task || !state.schema || !to) return;
+  // Бросок в свой же лейн — не изменение: ни запроса, ни мигания карточки.
+  if (normalizeStatus(state.schema, task.status) === normalizeStatus(state.schema, to)) return;
+
+  patchTask(id, { ...task, status: to });
+  try {
+    const res = await fetch(`/api/task/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || `сервер ответил ${res.status}`);
+    patchTask(id, data);
+  } catch (err) {
+    patchTask(id, task);
+    showNotice(`${id}: ${err.message}`);
+  }
+}
+
+function patchTask(id, task) {
+  snapshot.update((s) => ({ ...s, tasks: applyChange(s.tasks, { id, kind: 'updated', task }) }));
 }
