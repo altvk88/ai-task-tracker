@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/alkulagin-creator/tt/internal/taskop"
 )
 
 // ResolveVault определяет путь к vault: флаг --vault, иначе TT_VAULT.
@@ -31,5 +33,5 @@ func ResolveVault(flagValue string) (string, error) {
 
 // SchemaPath — путь к общему контракту правил внутри vault.
 func SchemaPath(vaultDir string) string {
-	return filepath.Join(vaultDir, ".task-tracker", "schema.json")
+	return taskop.SchemaPath(vaultDir)
 }

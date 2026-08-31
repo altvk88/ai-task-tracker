@@ -17,7 +17,15 @@ type Options struct {
 	// отрицательное значение — использовать defaultHeartbeat. Настраиваемо,
 	// иначе тесты ждали бы реальные 30 секунд.
 	HeartbeatInterval time.Duration
+
+	// Agent — имя писателя, от которого сервер меняет статусы. Пусто —
+	// defaultAgent. Оно сравнивается с claim таски, поэтому веб не должен
+	// притворяться bash-агентом: чужую занятую таску забирать нельзя.
+	Agent string
 }
+
+// defaultAgent — под этим именем пишет веб-клиент, если не задано иное.
+const defaultAgent = "web"
 
 // Server отдаёт снимок vault и отдельные таски по HTTP.
 type Server struct {
@@ -40,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/snapshot", s.handleSnapshot)
 	mux.HandleFunc("/api/task/{id}", s.handleTask)
+	mux.HandleFunc("/api/task/{id}/status", s.handleSetStatus)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/", handleNotFound)
 	return mux
