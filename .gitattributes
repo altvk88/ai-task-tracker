@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.go text eol=lf
+# Фикстуры хранятся байт-в-байт: в них проверяются CRLF и BOM.
+internal/vault/testdata/** -text
