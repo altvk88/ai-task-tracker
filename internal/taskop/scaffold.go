@@ -145,8 +145,8 @@ func defaultProjectName(vaultDir string) string {
 }
 
 // defaultIDPrefix выводит префикс ID из имени проекта: инициалы слов через
-// дефис (как OVH у "webapp", TT у "task-tracker" в живом vault), а для
-// однословного имени — первые буквы. Это только стартовая догадка — тот, кому
+// дефис (TT у "task-tracker"), а для однословного имени — первые три буквы
+// (WEB у "webapp"). Это только стартовая догадка — тот, кому
 // не подходит, передаёт свой через --id-prefix.
 func defaultIDPrefix(project string) string {
 	var initials strings.Builder
