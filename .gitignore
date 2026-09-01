@@ -16,3 +16,8 @@
 # Артефакт сборки установщика (Inno Setup) — не коммитится, собирается из
 # installer/tt.iss командой ISCC.exe.
 /installer/Output/
+
+# Артефакты сборки macOS-поставки — не коммитятся, собираются из
+# installer/macos/build.sh (staging-каталог и архивы под каждую архитектуру).
+/installer/macos/dist/
+/installer/macos/*.tar.gz

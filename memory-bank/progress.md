@@ -35,6 +35,19 @@
 доску, плагин Obsidian опцией. Иконка приложения — в exe, установщике, ярлыках и
 фавиконе доски.
 
+**Установщик macOS (TT-057)** — `installer/macos/build.sh` кросс-компилирует
+`darwin/arm64` и `darwin/amd64` (без Mac, CGO не используется) и собирает staging +
+архивы; `installer/macos/install.sh` делает то же, что windows-версия: PATH через
+`~/.zprofile`/`~/.bash_profile`, vault и порт через `tt config set`, `tt scaffold` по
+запросу, автозапуск через `launchd` (`~/Library/LaunchAgents`) с согласия, плагин
+Obsidian опцией по умолчанию выключенной. `uninstall.sh` не трогает vault/настройки.
+Собрать `.pkg`/`.dmg` без Mac нельзя — `pkgbuild`/`hdiutil` существуют только там,
+поэтому форма поставки — архив + скрипт. Homebrew-формула рассмотрена и отклонена
+(README, раздел про macOS) — `brew install` не может провести диалог установки без
+дублирования install.sh. Gatekeeper описан в README по аналогии со SmartScreen.
+**Не проверено на живой macOS** — машины нет: Gatekeeper, `launchd`, правка профиля
+шелла. Проверены только синтаксис (`bash -n`) и кросс-сборка бинарников.
+
 ## Deployed
 
 Инструмент локальный. `tt.exe` собирается на месте.

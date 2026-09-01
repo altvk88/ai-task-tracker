@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Автозапуск "tt serve" через launchd (аналог windows-версии, где та же роль
+  у ярлыка в автозагрузке на tt-serve-hidden.vbs). LaunchAgent, а не
+  LaunchDaemon — работает в сессии залогиненного пользователя, без sudo и
+  без прав администратора, запускается заново при входе (RunAtLoad) и не
+  перезапускается бесконечно при падении (KeepAlive не задан намеренно:
+  "tt serve" не демон, а обычный процесс — один сбой не должен уйти в
+  цикл рестартов).
+
+  __TT_BIN__, __LOG_DIR__ подставляются install.sh через sed при копировании
+  в ~/Library/LaunchAgents — сам install.sh знает путь установки и логов,
+  шаблон в git этого знать не может.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tt.serve</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__TT_BIN__</string>
+    <string>serve</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>__LOG_DIR__/tt-serve.log</string>
+  <key>StandardErrorPath</key>
+  <string>__LOG_DIR__/tt-serve.err.log</string>
+</dict>
+</plist>
