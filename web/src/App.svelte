@@ -5,6 +5,7 @@
   import Board from './Board.svelte';
   import Pulse from './Pulse.svelte';
   import TaskPanel from './TaskPanel.svelte';
+  import CreateTask from './CreateTask.svelte';
 
   // Снимок и подписка на изменения поднимаются вместе; возвращённая функция
   // закрывает поток при размонтировании.
@@ -41,3 +42,4 @@
 {/if}
 
 <TaskPanel />
+<CreateTask />

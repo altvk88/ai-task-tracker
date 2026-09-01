@@ -590,3 +590,88 @@ h1 {
 .markdown-body th {
   background: var(--lane-bg);
 }
+
+/* Правка таски и форма создания (TT-054). Переиспользуют переменные и
+   размеры полей тулбара — новых цветов не заводим. */
+
+.field-input {
+  background: var(--card-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.field-input.textarea {
+  resize: vertical;
+  min-height: 4rem;
+}
+
+.field-input.body-textarea {
+  min-height: 10rem;
+}
+
+.panel-title-input {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0.5rem 0 1rem;
+}
+
+.btn {
+  background: var(--card-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 1rem;
+}
+
+.conflict-banner {
+  border: 1px solid var(--priority-high);
+  border-radius: 4px;
+  background: var(--lane-bg);
+  padding: 0.5rem 0.65rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.82rem;
+}
+
+.conflict-banner p {
+  margin: 0 0 0.5rem;
+}
+
+.create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

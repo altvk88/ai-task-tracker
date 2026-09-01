@@ -41,8 +41,13 @@ function captureTokenFromURL() {
 }
 captureTokenFromURL();
 
-/** Заголовок Authorization для fetch, если токен когда-либо был получен. */
-function authHeaders() {
+/**
+ * Заголовок Authorization для fetch, если токен когда-либо был получен.
+ * Экспортирован: панель таски и форма создания (TT-054) — такие же
+ * писатели, как смена статуса, и им нужен тот же токен для записи с
+ * телефона из локальной сети.
+ */
+export function authHeaders() {
   try {
     const token = sessionStorage.getItem(TOKEN_KEY);
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -202,6 +207,9 @@ export function dismissNotice() {
 /** ID выбранной карточки — по ней TaskPanel открывает боковую панель. */
 export const selectedId = writable('');
 
+/** Открыта ли форма создания таски (кнопка на тулбаре, TT-054). */
+export const creating = writable(false);
+
 // --- Переключатель «доска / пульс» (TT-035) ------------------------------
 
 export const view = writable('board');
@@ -239,6 +247,12 @@ export async function moveTask(id, to) {
   }
 }
 
-function patchTask(id, task) {
+/**
+ * Точечно обновляет одну таску в снимке — общий хвост moveTask и, с TT-054,
+ * панели/формы создания: сохранили поле, тело или создали таску — сразу
+ * показываем актуальный ответ сервера, не дожидаясь SSE (оно всё равно
+ * придёт следом и просто повторно применит то же самое).
+ */
+export function patchTask(id, task) {
   snapshot.update((s) => ({ ...s, tasks: applyChange(s.tasks, { id, kind: 'updated', task }) }));
 }

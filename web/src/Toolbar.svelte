@@ -1,7 +1,7 @@
 <script>
   // Фильтр по проекту, поиск по ID/заголовку и переключатель старых закрытых.
   // Все изменения идут через store.js — сам тулбар состояния не хранит.
-  import { filter, projects, visibleTasks } from './store.js';
+  import { filter, projects, visibleTasks, creating } from './store.js';
 </script>
 
 <div class="toolbar">
@@ -31,6 +31,8 @@
     />
     показывать старые закрытые
   </label>
+
+  <button type="button" class="btn btn-primary" onclick={() => creating.set(true)}>+ Новая таска</button>
 
   <span class="counter">Показано: {$visibleTasks.length}</span>
 </div>
