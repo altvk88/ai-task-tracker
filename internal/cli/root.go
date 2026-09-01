@@ -9,16 +9,17 @@ import (
 	"github.com/alkulagin-creator/tt/internal/taskop"
 )
 
-// ResolveVault определяет путь к vault: флаг --vault, иначе TT_VAULT.
-// Пути по умолчанию нет намеренно: молча писать в чужой каталог хуже,
-// чем потребовать один явный флаг.
+// ResolveVault определяет путь к vault: флаг --vault, иначе TT_VAULT, иначе
+// файл настроек (см. config.go). Пути по умолчанию нет намеренно: молча
+// писать в чужой каталог хуже, чем потребовать один явный флаг или запись
+// в файле настроек — оба варианта видны и осознанны.
 func ResolveVault(flagValue string) (string, error) {
-	candidate := flagValue
-	if candidate == "" {
-		candidate = os.Getenv("TT_VAULT")
+	candidate, _, err := resolveVaultValue(flagValue)
+	if err != nil {
+		return "", err
 	}
 	if candidate == "" {
-		return "", fmt.Errorf("не задан путь к vault: укажи --vault <путь> или переменную TT_VAULT")
+		return "", fmt.Errorf("не задан путь к vault: укажи --vault <путь>, переменную TT_VAULT или запиши его в файл настроек (tt config set --vault <путь>)")
 	}
 	abs, err := filepath.Abs(candidate)
 	if err != nil {

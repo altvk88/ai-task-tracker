@@ -11,6 +11,9 @@ func TestResolveVault(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "tasks"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// Указываем на заведомо отсутствующий файл настроек: без этого тест читал
+	// бы реальный %APPDATA%/tt/config.json разработчика и был бы недетерминирован.
+	t.Setenv("TT_CONFIG_PATH", filepath.Join(t.TempDir(), "config.json"))
 
 	t.Run("флаг важнее переменной окружения", func(t *testing.T) {
 		t.Setenv("TT_VAULT", "C:/несуществующий")

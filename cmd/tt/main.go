@@ -31,8 +31,12 @@ const usage = `tt — таск-трекер над markdown-vault
   tt done    [--vault ПУТЬ] [--agent ИМЯ] [--result ТЕКСТ] ID
   tt doctor [--vault ПУТЬ] [--fix]
   tt serve  [--vault ПУТЬ] [--port N] [--listen АДРЕС] [--agent ИМЯ] [--token ТОКЕН]
+  tt config show [--vault ПУТЬ] [--port N]
+  tt config set  [--vault ПУТЬ] [--port N]
 
-Путь к vault берётся из --vault, иначе из переменной TT_VAULT.
+Путь к vault берётся из --vault, иначе из переменной TT_VAULT, иначе из файла
+настроек (см. tt config). Порт tt serve — из --port, иначе из файла настроек,
+иначе встроенный дефолт 4173.
 `
 
 // defaultServePort — порт tt serve по умолчанию. Не 8080 и не 3000: оба часто
@@ -214,17 +218,24 @@ func run(cmd string, args []string) error {
 		if err != nil {
 			return err
 		}
+		// resolvedPort — порт с учётом файла настроек. flagSet(...) нужен, потому
+		// что у --port уже есть значение по умолчанию: «флаг не передан» и «передан
+		// ровно 4173» неразличимы без явной проверки через fs.Visit.
+		resolvedPort, _, err := cli.ResolvePort(*port, flagSet(fs, "port"), defaultServePort)
+		if err != nil {
+			return err
+		}
 		// --listen принимает и голый адрес ("0.0.0.0"), и полный ("0.0.0.0:4180").
 		// Без этого `--listen 0.0.0.0 --port 4179` падал с «missing port in address»:
 		// в справке флаги описаны как независимые, значит и сочетаться должны.
 		addr := *listen
 		switch {
 		case addr == "":
-			addr = net.JoinHostPort("localhost", fmt.Sprint(*port))
+			addr = net.JoinHostPort("localhost", fmt.Sprint(resolvedPort))
 		case !strings.Contains(addr, ":"):
-			addr = net.JoinHostPort(addr, fmt.Sprint(*port))
+			addr = net.JoinHostPort(addr, fmt.Sprint(resolvedPort))
 		case strings.HasSuffix(addr, ":"):
-			addr = net.JoinHostPort(strings.TrimSuffix(addr, ":"), fmt.Sprint(*port))
+			addr = net.JoinHostPort(strings.TrimSuffix(addr, ":"), fmt.Sprint(resolvedPort))
 		}
 
 		tok := *token
@@ -239,6 +250,27 @@ func run(cmd string, args []string) error {
 		defer stop()
 		return serve(ctx, dir, addr, *agent, tok)
 
+	case "config":
+		if len(args) == 0 {
+			return fmt.Errorf("использование: tt config show|set [--vault ПУТЬ] [--port N]")
+		}
+		sub, rest := args[0], args[1:]
+		fs := flag.NewFlagSet("config "+sub, flag.ExitOnError)
+		vaultFlag := fs.String("vault", "", "путь к vault")
+		port := fs.Int("port", defaultServePort, "порт tt serve")
+		if err := fs.Parse(rest); err != nil {
+			return err
+		}
+		portSet := flagSet(fs, "port")
+		switch sub {
+		case "show":
+			return cli.ConfigShow(os.Stdout, *vaultFlag, *port, portSet)
+		case "set":
+			return cli.ConfigSet(os.Stdout, *vaultFlag, *vaultFlag != "", *port, portSet)
+		default:
+			return fmt.Errorf("неизвестная подкоманда %q для tt config: show|set", sub)
+		}
+
 	case "help", "--help", "-h":
 		fmt.Print(usage)
 		return nil
@@ -246,6 +278,19 @@ func run(cmd string, args []string) error {
 	default:
 		return fmt.Errorf("неизвестная команда %q\n\n%s", cmd, usage)
 	}
+}
+
+// flagSet сообщает, был ли флаг name реально передан в командной строке —
+// в отличие от *fs.Int/*fs.String, которые для непереданного флага неотличимы
+// от переданного со значением по умолчанию.
+func flagSet(fs *flag.FlagSet, name string) bool {
+	set := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
 }
 
 // serve строит индекс, запускает слежение за vault в фоне и поднимает HTTP до
