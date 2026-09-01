@@ -29,16 +29,30 @@ Go-зависимостей три: `gopkg.in/yaml.v3`, `github.com/fsnotify/fsn
 ## Команды
 
 ```
-tt list   [--vault ПУТЬ] [--project ИМЯ] [--status СТАТУС] [--json]
-tt new    [--vault ПУТЬ] --project ИМЯ --title ТЕКСТ [--priority high|medium|low]
-          [--effort 2h] [--depends-on ID,ID] [--spec ПУТЬ]
-tt set    [--vault ПУТЬ] [--agent ИМЯ] ID КЛЮЧ [ЗНАЧЕНИЕ]
+tt list    [--vault ПУТЬ] [--project ИМЯ] [--status СТАТУС] [--json]
+tt new     [--vault ПУТЬ] --project ИМЯ --title ТЕКСТ [--priority high|medium|low]
+           [--effort 2h] [--depends-on ID,ID] [--spec ПУТЬ]
+tt next    [--vault ПУТЬ] --project ИМЯ [--json]
 tt claim   [--vault ПУТЬ] [--agent ИМЯ] ID
 tt release [--vault ПУТЬ] ID
 tt reset   [--vault ПУТЬ] ID
-tt doctor [--vault ПУТЬ] [--fix]
-tt serve  [--vault ПУТЬ] [--port N] [--listen АДРЕС] [--agent ИМЯ]
+tt set     [--vault ПУТЬ] [--agent ИМЯ] ID КЛЮЧ [ЗНАЧЕНИЕ]
+tt done    [--vault ПУТЬ] [--agent ИМЯ] [--result ТЕКСТ] ID
+tt doctor  [--vault ПУТЬ] [--fix]
+tt serve   [--vault ПУТЬ] [--port N] [--listen АДРЕС] [--agent ИМЯ] [--token ТОКЕН]
 ```
+
+Полный цикл выглядит так:
+
+```bash
+tt new --project myapp --title "Починить логин" --priority high   # → APP-042
+tt next --project myapp                                           # что брать
+tt claim APP-042                                                  # взять в работу
+tt done --result "исправлено, тесты зелёные" APP-042              # закрыть
+```
+
+`tt done` сам снимает claim с замком и переводит в `ready` те таски, для которых
+закрытая была последним живым блокером.
 
 Путь к vault берётся из `--vault`, иначе из `TT_VAULT`. Пути по умолчанию нет намеренно:
 молча писать в чужой каталог хуже, чем потребовать один флаг.
@@ -99,12 +113,16 @@ HTTP, и вотчер. Сама доска на этом этапе — загл
 
 ## Состояние
 
-Этапы 1–3 завершены: чтение и запись, `list` / `set` / `doctor`, плагин Obsidian,
-`tt serve` с веб-доской — лейны, перетаскивание, живое обновление по SSE, панель
-таски, страница «Пульс», доступ по локальной сети с токеном на запись.
+**Все четыре этапа завершены.** Чтение и запись, полный жизненный цикл таски,
+плагин Obsidian, веб-доска с доступом по локальной сети, слеш-команды всех четырёх
+семейств агентов переведены на `tt`, замещённые bash-скрипты сняты.
 
-Дальше по спеку — этап 4: `tt new` / `claim` / `done` / `next`, перевод слеш-команд
-на `tt` и снос замещённых bash-скриптов.
+От прежнего shell-ядра осталось два скрипта, и у обоих нет замены в `tt`:
+`tt-resolve.sh` определяет vault и проект по `.task-tracker.json` текущего
+репозитория, `tt-active.sh` держит маркер активной таски для statusline.
+
+Файловых Kanban-досок больше нет: статус живёт только в поле `status:` таски,
+а канбан рисуется на лету — плагином внутри Obsidian или веб-доской.
 
 Замеры на живом vault из 1300 тасок:
 
