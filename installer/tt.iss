@@ -41,6 +41,7 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 [Tasks]
 Name: "addpath"; Description: "Добавить tt в PATH"
 Name: "autostart"; Description: "Запускать ""tt serve"" при входе в систему (без окна консоли)"
+Name: "desktopicon"; Description: "Ярлык на рабочем столе"; GroupDescription: "Дополнительные ярлыки:"
 Name: "plugin"; Description: "Установить плагин Obsidian tt-board в выбранный vault (только если он ещё не стоит)"; Flags: unchecked
 
 [Files]
@@ -62,8 +63,16 @@ Source: "..\internal\model\schema_default.json"; DestDir: "{app}\obsidian-plugin
 Source: "..\tt.exe"; DestDir: "{tmp}"; Flags: dontcopy
 
 [Icons]
-Name: "{group}\tt"; Filename: "{app}\{#MyAppExeName}"
+; Ярлык открывает доску в браузере, а не консоль: "tt-serve-hidden.vbs open"
+; сам поднимает "tt serve", если он ещё не отвечает на порту из настроек,
+; и только потом переходит по адресу — см. комментарии в самом скрипте.
+Name: "{group}\{#MyAppName}"; Filename: "{app}\tt-serve-hidden.vbs"; Parameters: "open"; \
+    WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; \
+    Comment: "Открыть доску tt в браузере"
 Name: "{group}\Удалить tt"; Filename: "{uninstallexe}"
+Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\tt-serve-hidden.vbs"; Parameters: "open"; \
+    WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; \
+    Comment: "Открыть доску tt в браузере"
 Name: "{userstartup}\tt serve"; Filename: "{app}\tt-serve-hidden.vbs"; Tasks: autostart; \
     WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"
 
