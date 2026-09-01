@@ -50,8 +50,23 @@ End If
 ' и браузер не трогает. ----
 If WScript.Arguments.Count > 0 Then
   If LCase(WScript.Arguments(0)) = "open" Then
+    ' Ждём ответа сервера, а не фиксированную паузу: холодный старт замерялся
+    ' в 580-600 мс, но на загруженной машине легко выходит за секунду, и
+    ' браузер тогда открылся бы на «не удаётся подключиться». Опрашиваем до
+    ' 10 секунд и открываем браузер сразу, как только пришёл ответ.
     If Not running Then
-      WScript.Sleep 800 ' дать серверу подняться до первого запроса браузера
+      For i = 1 To 40
+        WScript.Sleep 250
+        On Error Resume Next
+        Set ping = CreateObject("WinHttp.WinHttpRequest.5.1")
+        ping.SetTimeouts 500, 500, 500, 500
+        ping.Open "GET", url, False
+        ping.Send
+        started = (Err.Number = 0)
+        Err.Clear
+        On Error Goto 0
+        If started Then Exit For
+      Next
     End If
     shell.Run url, 1, False
   End If
