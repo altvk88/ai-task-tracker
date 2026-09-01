@@ -38,13 +38,15 @@
 
 ## In progress
 
-**TT-047 — установщик Windows**, статус `needs-input`. `installer/tt.iss` на Inno Setup 6:
-vault с проверкой `tasks/`, порт, PATH, автозапуск через VBS без окна консоли, плагин
-Obsidian опцией. Настройки пишутся через `tt config set` (TT-046), не правкой JSON.
-Тихая установка в изолированный каталог проверена; реальный PATH и автозапуск — за владельцем.
+**TT-047 — установщик Windows**, статус `needs-input`: собран и проверен тихой установкой
+в изолированный каталог, но реальный PATH, автозапуск при входе и клик по ярлыку
+проверяются только на машине владельца.
 
-Ловушка сборки: `obsidian-plugin/main.js` лежит в `.gitignore`, поэтому перед `ISCC.exe`
-нужен `npm run build` и в `web/`, и в `obsidian-plugin/`.
+Готово вокруг него: `tt config` (TT-046), `tt scaffold` (TT-048), ярлыки доски (TT-049),
+повтор `rename` при кратковременном захвате файла (TT-050).
+
+Ловушка сборки: `obsidian-plugin/main.js` в `.gitignore`, поэтому перед `ISCC.exe` нужен
+`npm run build` и в `web/`, и в `obsidian-plugin/`.
 
 ## Next
 
