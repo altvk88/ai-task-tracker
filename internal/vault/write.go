@@ -2,11 +2,25 @@ package vault
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
+)
+
+// Сколько раз и с какой паузой повторять rename при ошибке доступа. На NTFS
+// сторонний процесс (индексатор Windows, антивирус, открытый в Obsidian файл)
+// может коротко держать целевой файл, и rename поверх него возвращает
+// ACCESS_DENIED, а не «файл занят» — хотя занятость временная и проходит сама
+// за миллисекунды. Суммарная пауза та же, что и у замка в lock.go: с запасом
+// хватает пережить чужую блокировку, и мало, чтобы заметно задержать команду
+// при настоящей проблеме с правами.
+const (
+	renameAttempts   = 10
+	renameRetryPause = 5 * time.Millisecond
 )
 
 // SetField переписывает ровно один ключ фронтматтера, не трогая остальные байты
@@ -145,9 +159,29 @@ func writeAtomic(path string, data []byte) error {
 		os.Remove(tmp)
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := renameAtomic(tmp, path); err != nil {
 		os.Remove(tmp)
 		return err
 	}
 	return nil
+}
+
+// renameAtomic переносит tmp поверх path с повтором на ошибку доступа —
+// см. константы renameAttempts/renameRetryPause. Ошибки, не связанные с
+// занятостью файла (например, путь не существует), возвращаются сразу же,
+// без ожидания.
+func renameAtomic(tmp, path string) error {
+	var lastErr error
+	for attempt := 0; attempt < renameAttempts; attempt++ {
+		err := os.Rename(tmp, path)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, os.ErrPermission) {
+			return err
+		}
+		lastErr = err
+		time.Sleep(renameRetryPause)
+	}
+	return fmt.Errorf("%w (похоже, файл занят другим процессом — Obsidian, антивирус или индексатор Windows)", lastErr)
 }
