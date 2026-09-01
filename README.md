@@ -34,9 +34,16 @@ Go-зависимостей три: `gopkg.in/yaml.v3`, `github.com/fsnotify/fsn
 
 ```bash
 cd web && npm install && npm run build && cd ..
+cd obsidian-plugin && npm install && npm run build && cd ..
 go build -o tt.exe ./cmd/tt
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\tt.iss
+"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" installer\tt.iss
 ```
+
+Плагин собирается обязательно: `obsidian-plugin/main.js` — артефакт сборки, в git
+его нет, а установщик кладёт его в поставку. Пропустишь шаг — `ISCC.exe` упадёт
+на отсутствующем файле. Путь к `ISCC.exe` зависит от способа установки Inno
+Setup: winget кладёт его в профиль пользователя, установщик с сайта по умолчанию
+— в `C:\Program Files (x86)\Inno Setup 6\`.
 
 Готовый `.exe` появляется в `installer/Output/` (в git не коммитится). Установщик
 не требует прав администратора: каталог по умолчанию — в профиле пользователя,
