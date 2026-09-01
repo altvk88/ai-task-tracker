@@ -62,3 +62,14 @@ test('пустое тело не падает', () => {
   assert.equal(renderMarkdown(''), '');
   assert.equal(renderMarkdown(null), '');
 });
+
+test('картинка с опасной схемой не превращается в <img>', () => {
+  const html = renderMarkdown('![подпись](javascript:alert(1))');
+  assert.ok(!html.includes('<img'), html);
+  assert.ok(html.includes('подпись'), html);
+});
+
+test('обычная картинка остаётся картинкой', () => {
+  const html = renderMarkdown('![схема](https://example.com/a.png)');
+  assert.ok(html.includes('<img'), html);
+});

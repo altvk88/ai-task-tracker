@@ -58,6 +58,16 @@ const md = new Marked({
       }
       return false;
     },
+    // Та же проверка схемы для картинок. `<img src="javascript:...">` в
+    // современных браузерах инертен, но оставлять дыру того же класса,
+    // которую закрыли у ссылок, незачем — фильтр один и тот же.
+    image(token) {
+      const href = token.href || '';
+      if (HAS_SCHEME.test(href) && !SAFE_SCHEME.test(href)) {
+        return escapeHtml(token.text || '');
+      }
+      return false;
+    },
   },
 });
 

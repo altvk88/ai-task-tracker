@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -14,8 +15,8 @@ import (
 // Сколько раз и с какой паузой повторять rename при ошибке доступа. На NTFS
 // сторонний процесс (индексатор Windows, антивирус, открытый в Obsidian файл)
 // может коротко держать целевой файл, и rename поверх него возвращает
-// ACCESS_DENIED, а не «файл занят» — хотя занятость временная и проходит сама
-// сама. Бюджет здесь на порядок больше, чем у замка в lock.go, и намеренно:
+// ACCESS_DENIED, а не «файл занят» — хотя занятость временная и проходит сама.
+// Бюджет здесь на порядок больше, чем у замка в lock.go, и намеренно:
 // там ждут завершения отложенного удаления каталога ядром — это микросекунды,
 // а тут ждут чужой процесс, и проверка файла антивирусом занимает сотни
 // миллисекунд. Секунда ожидания дешевле, чем оборванная посередине составная
@@ -70,32 +71,9 @@ func SetBlock(path, key string, fields [][2]string) error {
 // setLines ищет ключ верхнего уровня во фронтматтере и заменяет его строку
 // (вместе со вложенным блоком, если он был) на newLines.
 func setLines(path, key string, newLines []string) error {
-	raw, err := os.ReadFile(path)
+	hasBOM, eol, lines, end, err := frontmatterLines(path)
 	if err != nil {
 		return err
-	}
-
-	hasBOM := bytes.HasPrefix(raw, bom)
-	raw = bytes.TrimPrefix(raw, bom)
-
-	eol := "\n"
-	if bytes.Contains(raw, []byte("\r\n")) {
-		eol = "\r\n"
-	}
-	lines := strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n")
-
-	if len(lines) == 0 || !isFence(lines[0]) {
-		return fmt.Errorf("%s: %w", path, ErrNoFrontmatter)
-	}
-	end := -1
-	for i := 1; i < len(lines); i++ {
-		if isFence(lines[i]) {
-			end = i
-			break
-		}
-	}
-	if end < 0 {
-		return fmt.Errorf("%s: %w", path, ErrUnclosedFrontmatter)
 	}
 
 	out := make([]string, 0, len(lines)+1)
@@ -123,6 +101,87 @@ func setLines(path, key string, newLines []string) error {
 	}
 	data.WriteString(strings.Join(out, eol))
 	return writeAtomic(path, data.Bytes())
+}
+
+// SetBody заменяет всё содержимое таски после закрывающего фенса
+// фронтматтера на body, не трогая ни байта до него, включая сам фенс. Тот же
+// принцип, что у setLines: BOM, eol и отсутствие завершающего перевода
+// строки переживают запись, round-trip через YAML не делается — тело вообще
+// не YAML.
+//
+// body ожидается с логическими переводами строк "\n"; SetBody сам переводит
+// их в eol файла и восстанавливает разделяющую пустую строку после фенса —
+// ту самую, которую Body срезает при чтении. Поэтому Body(path), тут же
+// записанное обратно через SetBody, не меняет файл ни на байт.
+func SetBody(path, body string) error {
+	hasBOM, eol, lines, end, err := frontmatterLines(path)
+	if err != nil {
+		return err
+	}
+
+	head := strings.Join(lines[:end+1], eol)
+	body = strings.ReplaceAll(body, "\r\n", "\n")
+
+	var data bytes.Buffer
+	if hasBOM {
+		data.Write(bom)
+	}
+	data.WriteString(head)
+	data.WriteString(eol)
+	if body != "" {
+		data.WriteString(eol)
+		data.WriteString(strings.ReplaceAll(body, "\n", eol))
+	}
+	return writeAtomic(path, data.Bytes())
+}
+
+// frontmatterLines читает файл и раскладывает его на составляющие, общие для
+// setLines и SetBody: признак BOM, исходный eol, содержимое построчно
+// (нормализованное к "\n") и индекс закрывающего фенса. Различается только
+// то, что каждая из них делает с результатом дальше.
+func frontmatterLines(path string) (hasBOM bool, eol string, lines []string, end int, err error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return false, "", nil, 0, err
+	}
+
+	hasBOM = bytes.HasPrefix(raw, bom)
+	raw = bytes.TrimPrefix(raw, bom)
+
+	eol = "\n"
+	if bytes.Contains(raw, []byte("\r\n")) {
+		eol = "\r\n"
+	}
+	lines = strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n")
+
+	if len(lines) == 0 || !isFence(lines[0]) {
+		return false, "", nil, 0, fmt.Errorf("%s: %w", path, ErrNoFrontmatter)
+	}
+	end = -1
+	for i := 1; i < len(lines); i++ {
+		if isFence(lines[i]) {
+			end = i
+			break
+		}
+	}
+	if end < 0 {
+		return false, "", nil, 0, fmt.Errorf("%s: %w", path, ErrUnclosedFrontmatter)
+	}
+	return hasBOM, eol, lines, end, nil
+}
+
+// Version — дешёвый признак изменения файла: время модификации в
+// наносекундах, отданное непрозрачной строкой. Не хеш содержимого — Stat
+// вместо чтения файла целиком, там, где вызывающему нужно лишь сравнить «то
+// же самое или нет» (снимок с 1297 задачами перечитывать целиком на каждый
+// запрос дорого). NTFS хранит mtime с точностью 100 нс — щедрый запас для
+// правки человеком или агентом с интервалом в секунды и больше.
+func Version(path string) (string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	return strconv.FormatInt(info.ModTime().UnixNano(), 10), nil
 }
 
 // isTopLevelKey — строка задаёт ключ верхнего уровня с таким именем.
