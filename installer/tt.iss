@@ -55,6 +55,11 @@ Source: "..\obsidian-plugin\styles.css"; DestDir: "{app}\obsidian-plugin"; Flags
 ; Так у чистого клона репозитория сборка установщика не зависит от соседних
 ; каталогов на диске.
 Source: "..\internal\model\schema_default.json"; DestDir: "{app}\obsidian-plugin"; DestName: "schema.json"; Flags: ignoreversion
+; Отдельная копия tt.exe с Flags: dontcopy — не устанавливается, а лежит в
+; составе установщика, чтобы её можно было извлечь во временный каталог и
+; вызвать ПРЯМО ИЗ МАСТЕРА (см. RunScaffold ниже): на шаге выбора vault
+; основная копия ещё не скопирована в {app}, установка файлов идёт позже.
+Source: "..\tt.exe"; DestDir: "{tmp}"; Flags: dontcopy
 
 [Icons]
 Name: "{group}\tt"; Filename: "{app}\{#MyAppExeName}"
@@ -71,6 +76,19 @@ var
 function IsValidVault(Path: string): Boolean;
 begin
   Result := (Path <> '') and DirExists(AddBackslash(Path) + 'tasks');
+end;
+
+{ ---- создание структуры vault вызовом "tt.exe scaffold" из временной копии.
+  Логика — в самом tt (см. internal/taskop/scaffold.go), установщик только
+  задаёт вопрос и зовёт команду: иначе структура vault была бы описана в
+  двух местах и разъехалась бы. ---- }
+function RunScaffold(VaultDir: string): Boolean;
+var
+  ResultCode: Integer;
+begin
+  ExtractTemporaryFile('tt.exe');
+  Result := Exec(ExpandConstant('{tmp}\tt.exe'), 'scaffold --vault "' + VaultDir + '"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
 { ---- проверка порта: свободен ли он локально ---- }
@@ -118,10 +136,27 @@ begin
     Vault := VaultPage.Values[0];
     if not IsValidVault(Vault) then
     begin
-      MsgBox('В каталоге' + #13#10 + Vault + #13#10 +
-        'нет подкаталога tasks — это не похоже на vault таск-трекера. Укажи другой каталог.',
-        mbError, MB_OK);
-      Result := False;
+      if Vault = '' then
+      begin
+        MsgBox('Укажи каталог vault.', mbError, MB_OK);
+        Result := False;
+        Exit;
+      end;
+      { Каталога с задачами нет — не тупик: возможно, vault ещё не заведён.
+        Предлагаем создать минимальную структуру прямо отсюда; отказ
+        возвращает на выбор каталога, как и раньше. }
+      if MsgBox('В каталоге' + #13#10 + Vault + #13#10 +
+        'нет подкаталога tasks — это не похоже на vault таск-трекера.' + #13#10#13#10 +
+        'Создать здесь структуру vault?', mbConfirmation, MB_YESNO) = IDYES then
+      begin
+        if not RunScaffold(Vault) then
+        begin
+          MsgBox('Не удалось создать структуру vault в' + #13#10 + Vault, mbError, MB_OK);
+          Result := False;
+        end;
+      end
+      else
+        Result := False;
     end;
   end;
 

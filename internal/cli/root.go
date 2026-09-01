@@ -32,6 +32,22 @@ func ResolveVault(flagValue string) (string, error) {
 	return abs, nil
 }
 
+// ResolveVaultForScaffold определяет путь к vault тем же порядком, что и
+// ResolveVault (флаг → TT_VAULT → файл настроек), но не требует уже
+// существующего каталога tasks — Scaffold как раз создаёт его. Без этого
+// установщику или свежему пользователю было бы некуда деться: обычный
+// ResolveVault отказал бы ровно там, где нужно предложить создать структуру.
+func ResolveVaultForScaffold(flagValue string) (string, error) {
+	candidate, _, err := resolveVaultValue(flagValue)
+	if err != nil {
+		return "", err
+	}
+	if candidate == "" {
+		return "", fmt.Errorf("не задан путь к vault: укажи --vault <путь>, переменную TT_VAULT или запиши его в файл настроек (tt config set --vault <путь>)")
+	}
+	return filepath.Abs(candidate)
+}
+
 // SchemaPath — путь к общему контракту правил внутри vault.
 func SchemaPath(vaultDir string) string {
 	return taskop.SchemaPath(vaultDir)

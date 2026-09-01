@@ -29,6 +29,7 @@ const usage = `tt — таск-трекер над markdown-vault
   tt release [--vault ПУТЬ] ID
   tt reset   [--vault ПУТЬ] ID
   tt done    [--vault ПУТЬ] [--agent ИМЯ] [--result ТЕКСТ] ID
+  tt scaffold [--vault ПУТЬ] [--project ИМЯ] [--id-prefix ПРЕФИКС]
   tt doctor [--vault ПУТЬ] [--fix]
   tt serve  [--vault ПУТЬ] [--port N] [--listen АДРЕС] [--agent ИМЯ] [--token ТОКЕН]
   tt config show [--vault ПУТЬ] [--port N]
@@ -189,6 +190,22 @@ func run(cmd string, args []string) error {
 			return err
 		}
 		return cli.Done(os.Stdout, dir, rest[0], *result, *agent)
+
+	case "scaffold":
+		fs := flag.NewFlagSet("scaffold", flag.ExitOnError)
+		vaultFlag := fs.String("vault", "", "путь к vault")
+		project := fs.String("project", "", "имя первого проекта; по умолчанию — имя каталога vault")
+		idPrefix := fs.String("id-prefix", "", "префикс ID проекта; по умолчанию выводится из имени проекта")
+		if err := fs.Parse(args); err != nil {
+			return err
+		}
+		// Не cli.ResolveVault: тот требует уже существующий каталог tasks,
+		// а scaffold как раз создаёт структуру там, где её ещё нет.
+		dir, err := cli.ResolveVaultForScaffold(*vaultFlag)
+		if err != nil {
+			return err
+		}
+		return cli.Scaffold(os.Stdout, dir, taskop.ScaffoldOptions{Project: *project, IDPrefix: *idPrefix})
 
 	case "doctor":
 		fs := flag.NewFlagSet("doctor", flag.ExitOnError)
