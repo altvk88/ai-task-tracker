@@ -12,3 +12,7 @@
 /web/dist/*
 !/web/dist/.gitkeep
 /tt.exe~
+
+# Артефакт сборки установщика (Inno Setup) — не коммитится, собирается из
+# installer/tt.iss командой ISCC.exe.
+/installer/Output/
