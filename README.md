@@ -26,6 +26,26 @@ go build -o tt.exe ./cmd/tt
 Go-зависимостей три: `gopkg.in/yaml.v3`, `github.com/fsnotify/fsnotify` и
 `golang.org/x/sys` (транзитивная). На выходе один статический бинарник.
 
+### Иконка
+
+Мастер-файл — `assets/tt.png` (квадратный, с прозрачным фоном). Из него
+`python assets/make-icons.py` собирает `assets/tt.ico` для установщика,
+`web/public/favicon.ico` для вкладки браузера и `web/public/apple-touch-icon.png`.
+У веба свой, урезанный `.ico`: браузер скачивает файл целиком, и полный набор
+с 256-м размером весит 78 КБ на каждое открытие доски против 9 КБ.
+
+Иконка `tt.exe` лежит ресурсом в `cmd/tt/rsrc_windows.syso` — он в git, так что
+обычная сборка ничего дополнительно не требует. Перевшивать нужно только после
+правки `assets/tt.ico`:
+
+```bash
+go install github.com/akavel/rsrc@latest
+rsrc -ico assets/tt.ico -arch amd64 -o cmd/tt/rsrc_windows.syso
+```
+
+Суффикс `_windows` в имени `.syso` обязателен: без него Go попытается
+прилинковать ресурс Windows и при сборке под другие системы.
+
 ### Установщик Windows
 
 `installer/tt.iss` — скрипт Inno Setup 6 (ставится через winget:

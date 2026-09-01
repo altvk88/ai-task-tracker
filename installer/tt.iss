@@ -6,8 +6,10 @@
 ; Перед сборкой установщика ОБЯЗАТЕЛЬНО собрать веб-бандл и бинарник в
 ; таком порядке (см. README.md, раздел "Сборка"):
 ;   cd web && npm install && npm run build && cd ..
+;   cd obsidian-plugin && npm install && npm run build && cd ..
 ;   go build -o tt.exe ./cmd/tt
-; Иначе в установщик попадёт заглушка вместо доски.
+; Иначе в установщик попадёт заглушка вместо доски, а плагин Obsidian
+; не соберётся вовсе: его main.js — артефакт сборки и в git не лежит.
 ;
 ; Установка идёт без прав администратора (PrivilegesRequired=lowest):
 ; каталог по умолчанию — в профиле пользователя, PATH и автозагрузка тоже
@@ -33,6 +35,10 @@ OutputBaseFilename=tt-setup-{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+; Иконка самого установщика. Ярлыки и запись в "Программах и компонентах"
+; берут иконку прямо из tt.exe — она вшита туда ресурсом (cmd/tt/rsrc_windows.syso),
+; поэтому отдельный .ico в поставку класть не нужно.
+SetupIconFile=..\assets\tt.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
