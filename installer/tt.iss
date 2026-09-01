@@ -62,6 +62,10 @@ Source: "..\obsidian-plugin\styles.css"; DestDir: "{app}\obsidian-plugin"; Flags
 ; Так у чистого клона репозитория сборка установщика не зависит от соседних
 ; каталогов на диске.
 Source: "..\internal\model\schema_default.json"; DestDir: "{app}\obsidian-plugin"; DestName: "schema.json"; Flags: ignoreversion
+; Инструкция по подключению Claude Code/Codex (TT-058) — тот же файл, что и
+; в корне репозитория и в README.md. Кладётся рядом с программой, чтобы к
+; ней можно было вернуться после установки, не открывая репозиторий заново.
+Source: "..\AGENT-INTEGRATION.md"; DestDir: "{app}"; Flags: ignoreversion
 ; Отдельная копия tt.exe с Flags: dontcopy — не устанавливается, а лежит в
 ; составе установщика, чтобы её можно было извлечь во временный каталог и
 ; вызвать ПРЯМО ИЗ МАСТЕРА (см. RunScaffold ниже): на шаге выбора vault
@@ -75,12 +79,24 @@ Source: "..\tt.exe"; DestDir: "{tmp}"; Flags: dontcopy
 Name: "{group}\{#MyAppName}"; Filename: "{app}\tt-serve-hidden.vbs"; Parameters: "open"; \
     WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; \
     Comment: "Открыть доску tt в браузере"
+; .md не у всех ассоциирован с приложением — открываем явно через notepad.exe,
+; чтобы двойной клик не упирался в диалог "чем открыть" (TT-058).
+Name: "{group}\Подключение агентов (Claude Code, Codex)"; \
+    Filename: "{win}\notepad.exe"; Parameters: """{app}\AGENT-INTEGRATION.md"""
 Name: "{group}\Удалить tt"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\tt-serve-hidden.vbs"; Parameters: "open"; \
     WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; \
     Comment: "Открыть доску tt в браузере"
 Name: "{userstartup}\tt serve"; Filename: "{app}\tt-serve-hidden.vbs"; Tasks: autostart; \
     WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"
+
+[Run]
+; Предложение открыть инструкцию по подключению агентов на финальной странице
+; мастера (TT-058) — не отмечено по умолчанию, чтобы не быть навязчивым;
+; тот же файл остаётся рядом с программой и доступен из меню Пуск.
+Filename: "{win}\notepad.exe"; Parameters: """{app}\AGENT-INTEGRATION.md"""; \
+    Description: "Открыть инструкцию по подключению ИИ-агентов (Claude Code, Codex)"; \
+    Flags: postinstall skipifsilent unchecked
 
 [Code]
 var
@@ -117,6 +133,19 @@ begin
     'try { $l.Start(); exit 0 } catch { exit 1 } finally { $l.Stop() }"';
   Result := Exec('powershell.exe', Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
     and (ResultCode = 0);
+end;
+
+{ ---- финальная страница мастера: короткая наводка на инструкцию по
+  подключению ИИ-агентов (Claude Code, Codex) поверх стандартного текста
+  Inno Setup — сам файл AGENT-INTEGRATION.md лежит рядом с программой и
+  доступен из меню Пуск (TT-058). ---- }
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if CurPageID = wpFinished then
+    WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
+      'Хочешь, чтобы задачи в этом vault выполнял ИИ-агент? Инструкция по ' +
+      'подключению Claude Code и Codex — в файле AGENT-INTEGRATION.md рядом ' +
+      'с программой (и в меню Пуск → tt → «Подключение агентов»).';
 end;
 
 procedure InitializeWizard;

@@ -118,5 +118,23 @@ if [ "$PLUGIN" = "y" ] || [ "$PLUGIN" = "Y" ]; then
   echo "Плагин установлен в $PLUGIN_DIR"
 fi
 
+# ---- инструкция по подключению ИИ-агентов (Claude Code, Codex) — TT-058.
+# Файл кладётся рядом с бинарником, чтобы вернуться к нему после установки;
+# логика подключения самих агентов сюда не дублируется — она в самом файле
+# и в agents/claude, agents/codex репозитория. ----
+AGENT_DOC="$INSTALL_DIR/AGENT-INTEGRATION.md"
+if [ -f "$HERE/AGENT-INTEGRATION.md" ]; then
+  cp "$HERE/AGENT-INTEGRATION.md" "$AGENT_DOC"
+fi
+
 echo
 echo "Готово. Проверить: tt config show"
+
+if [ -f "$AGENT_DOC" ]; then
+  cat <<EOF
+
+Хочешь, чтобы задачи в этом vault выполнял ИИ-агент? Инструкция по
+подключению Claude Code и Codex — в файле:
+  $AGENT_DOC
+EOF
+fi

@@ -35,17 +35,13 @@ cp "$HERE/install.sh" "$HERE/uninstall.sh" "$HERE/com.tt.serve.plist.template" "
 cp "$ROOT/obsidian-plugin/main.js" "$ROOT/obsidian-plugin/manifest.json" \
    "$ROOT/obsidian-plugin/styles.css" "$DIST/obsidian-plugin/"
 cp "$ROOT/internal/model/schema_default.json" "$DIST/obsidian-plugin/schema.json"
-# AGENT-INTEGRATION.md добавляется сюда после TT-058 (инструкция по агентам) —
-# до тех пор её ещё нет в репозитории.
-[ -f "$ROOT/AGENT-INTEGRATION.md" ] && cp "$ROOT/AGENT-INTEGRATION.md" "$DIST/"
+cp "$ROOT/AGENT-INTEGRATION.md" "$DIST/"
 chmod +x "$DIST/install.sh" "$DIST/uninstall.sh"
 
 for arch in arm64 amd64; do
-  EXTRA=""
-  [ -f "$DIST/AGENT-INTEGRATION.md" ] && EXTRA="AGENT-INTEGRATION.md"
   tar -C "$DIST" -czf "$HERE/tt-darwin-$arch-$VERSION.tar.gz" \
     "tt-darwin-$arch" install.sh uninstall.sh com.tt.serve.plist.template \
-    obsidian-plugin $EXTRA
+    obsidian-plugin AGENT-INTEGRATION.md
 done
 
 echo "Готово: $DIST/ и архивы installer/macos/tt-darwin-{arm64,amd64}-$VERSION.tar.gz"
