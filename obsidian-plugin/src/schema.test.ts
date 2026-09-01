@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parseSchema, normalize, lane, clearsClaimOn, setsCompletedOn, setsReadyAtOn } from "./schema.ts";
 
 const RAW = JSON.stringify({
@@ -50,8 +51,11 @@ test("битая схема даёт внятную ошибку, а не мол
   assert.throws(() => parseSchema(JSON.stringify({ statuses: [] })), /статус/i);
 });
 
-test("реальная схема vault разбирается и даёт десять статусов", () => {
-  const raw = readFileSync("D:/task tracker/.task-tracker/schema.json", "utf8");
+// Путь к vault машинозависим, поэтому тест включается переменной TT_SMOKE_VAULT —
+// тем же способом, что смоук-тесты Go. Без неё пропускается: зашитый абсолютный
+// путь ронял бы прогон у любого, кроме автора.
+test("реальная схема vault разбирается и даёт десять статусов", { skip: !process.env.TT_SMOKE_VAULT }, () => {
+  const raw = readFileSync(join(process.env.TT_SMOKE_VAULT, ".task-tracker", "schema.json"), "utf8");
   const s = parseSchema(raw);
   assert.equal(s.statuses.length, 10, "в схеме vault десять статусов");
   assert.equal(lane(s, "in-progress"), "In Progress");
