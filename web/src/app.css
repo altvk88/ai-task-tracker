@@ -502,3 +502,91 @@ h1 {
   padding: 0.5rem;
   margin: 0;
 }
+
+/* Тело таски (markdown из TaskPanel.svelte). Размеры уменьшены относительно
+   обычной страницы — это узкая боковая панель, а не документ. */
+
+.markdown-body {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.markdown-body :is(h1, h2, h3, h4, h5, h6) {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.4rem;
+}
+
+.markdown-body :is(h1, h2, h3, h4, h5, h6):first-child {
+  margin-top: 0;
+}
+
+.markdown-body p {
+  margin: 0.5rem 0;
+}
+
+.markdown-body :is(ul, ol) {
+  margin: 0.5rem 0;
+  padding-left: 1.3rem;
+}
+
+.markdown-body li {
+  margin: 0.15rem 0;
+}
+
+.markdown-body li input[type='checkbox'] {
+  margin-right: 0.3rem;
+}
+
+.markdown-body code {
+  font-family: monospace;
+  font-size: 0.8em;
+  background: var(--lane-bg);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+
+/* Блок кода не должен раздвигать панель вбок — прокрутка внутри себя. */
+.markdown-body pre {
+  overflow-x: auto;
+  background: var(--lane-bg);
+  border-radius: 4px;
+  padding: 0.5rem;
+}
+
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+}
+
+.markdown-body blockquote {
+  margin: 0.5rem 0;
+  padding-left: 0.6rem;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+
+.markdown-body a {
+  color: var(--accent);
+}
+
+/* Та же логика, что у .board (overflow-x: auto): таблица не должна
+   раздвигать панель, а вместо блочной обёртки достаточно сделать саму
+   таблицу блочным прокручиваемым элементом. */
+.markdown-body table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.82rem;
+}
+
+.markdown-body :is(th, td) {
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+
+.markdown-body th {
+  background: var(--lane-bg);
+}

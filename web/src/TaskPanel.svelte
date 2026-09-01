@@ -4,6 +4,7 @@
   // грузятся отдельным запросом лениво, при каждом открытии заново: держать
   // 1299 тел в памяти клиента незачем (см. комментарий у /api/task в api.go).
   import { selectedId, tasksById } from './store.js';
+  import { renderMarkdown } from './markdown.js';
 
   const CLOSED_STATUSES = new Set(['done', 'cancelled']);
 
@@ -138,7 +139,11 @@
 
         <div class="panel-section">
           <h3>Тело</h3>
-          <pre class="panel-raw">{detail.body || '(пусто)'}</pre>
+          {#if detail.body}
+            <div class="markdown-body">{@html renderMarkdown(detail.body)}</div>
+          {:else}
+            <p class="panel-status">(пусто)</p>
+          {/if}
         </div>
       {/if}
     </aside>
