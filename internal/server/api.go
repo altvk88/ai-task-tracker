@@ -10,6 +10,18 @@ import (
 	"github.com/alkulagin-creator/tt/internal/vault"
 )
 
+// fileVersion — признак версии таски для клиента: см. vault.Version.
+// Ошибка Stat (файл только что удалили) не повод падать 500 на снимке —
+// пустая версия просто не даст записи пройти конфликт-проверку у той
+// таски, зато остальные 1296 строк снимка не пострадают.
+func fileVersion(path string) string {
+	v, err := vault.Version(path)
+	if err != nil {
+		return ""
+	}
+	return v
+}
+
 // apiTask — таска в снимке. Имена и состав полей — как у listRow из
 // internal/cli/list.go: снимок читают и веб-клиент, и агенты, привыкшие к
 // `tt list --json`, расхождение в именах между ними того не стоит.
@@ -30,6 +42,12 @@ type apiTask struct {
 	Completed string    `json:"completed,omitempty"`
 	BlockedBy []string  `json:"blockedBy,omitempty"`
 	Claim     *apiClaim `json:"claim,omitempty"`
+
+	// Version — признак версии файла на момент ответа (см. vault.Version).
+	// Клиент обязан вернуть его как baseVersion в POST .../field и
+	// .../body — так конкурентная правка ловится конфликтом, а не тихо
+	// перезаписывается.
+	Version string `json:"version,omitempty"`
 }
 
 // summary — сводка по снимку.
@@ -117,7 +135,9 @@ func (s *Server) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 		if t.ParseErr != "" {
 			broken++
 		}
-		rows = append(rows, toAPITask(t, status))
+		row := toAPITask(t, status)
+		row.Version = fileVersion(t.Path)
+		rows = append(rows, row)
 	}
 
 	writeJSON(w, http.StatusOK, snapshotResponse{
@@ -165,8 +185,10 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	schema := s.ix.Schema()
 	status, _ := schema.Normalize(task.Status)
 
+	apiT := toAPITask(task, status)
+	apiT.Version = fileVersion(task.Path)
 	writeJSON(w, http.StatusOK, taskDetail{
-		apiTask:  toAPITask(task, status),
+		apiTask:  apiT,
 		Due:      task.Due,
 		Created:  task.Created,
 		ReadyAt:  task.ReadyAt,

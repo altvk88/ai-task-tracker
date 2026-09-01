@@ -265,6 +265,151 @@ func TestSetBlockSkipsEmptyFields(t *testing.T) {
 	}
 }
 
+// frontmatterOf вырезает фронтматтер (включая оба фенса) байт-в-байт — тем
+// же способом, каким SetBody его не должен трогать.
+func frontmatterOf(t *testing.T, text string) string {
+	t.Helper()
+	lines := strings.Split(text, "\n")
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimRight(lines[i], " \t\r") == "---" {
+			return strings.Join(lines[:i+1], "\n")
+		}
+	}
+	t.Fatal("не нашёл закрывающий фенс")
+	return ""
+}
+
+func TestSetBodyReplacesEverythingAfterFence(t *testing.T) {
+	p := writeTemp(t, sampleTask)
+	if err := SetBody(p, "## Новое тело\n\nСовсем другое.\n"); err != nil {
+		t.Fatalf("SetBody: %v", err)
+	}
+	after, _ := os.ReadFile(p)
+
+	if frontmatterOf(t, string(after)) != frontmatterOf(t, sampleTask) {
+		t.Fatalf("фронтматтер изменился:\n%s", after)
+	}
+	body, err := Body(after)
+	if err != nil {
+		t.Fatalf("Body: %v", err)
+	}
+	if body != "## Новое тело\n\nСовсем другое.\n" {
+		t.Fatalf("тело записано неверно: %q", body)
+	}
+}
+
+// Ключевой тест симметрии: то, что Body() отдал на чтение, записанное назад
+// через SetBody без изменений, не должно менять файл ни на байт.
+func TestSetBodyRoundTripWithBodyIsIdentity(t *testing.T) {
+	p := writeTemp(t, sampleTask)
+	before, _ := os.ReadFile(p)
+	body, err := Body(before)
+	if err != nil {
+		t.Fatalf("Body: %v", err)
+	}
+	if err := SetBody(p, body); err != nil {
+		t.Fatalf("SetBody: %v", err)
+	}
+	after, _ := os.ReadFile(p)
+	if string(after) != string(before) {
+		t.Fatalf("round-trip Body->SetBody изменил файл:\nбыло:\n%q\nстало:\n%q", before, after)
+	}
+}
+
+func TestSetBodyPreservesCRLF(t *testing.T) {
+	crlf := strings.ReplaceAll(sampleTask, "\n", "\r\n")
+	p := writeTemp(t, crlf)
+	if err := SetBody(p, "## CRLF\n\nтело\n"); err != nil {
+		t.Fatalf("SetBody: %v", err)
+	}
+	after, _ := os.ReadFile(p)
+	if strings.Contains(strings.ReplaceAll(string(after), "\r\n", ""), "\n") {
+		t.Error("часть переводов строк осталась без \\r — файл стал смешанным")
+	}
+	if !strings.Contains(string(after), "## CRLF\r\n\r\nтело\r\n") {
+		t.Errorf("тело записано не с CRLF:\n%q", after)
+	}
+}
+
+func TestSetBodyPreservesBOM(t *testing.T) {
+	p := writeTemp(t, "\ufeff"+sampleTask)
+	if err := SetBody(p, "новое тело\n"); err != nil {
+		t.Fatalf("SetBody: %v", err)
+	}
+	after, _ := os.ReadFile(p)
+	if !strings.HasPrefix(string(after), "\ufeff") {
+		t.Error("BOM потерян")
+	}
+}
+
+// Отсутствие завершающего перевода строки — законное состояние файла:
+// SetBody не должен ни требовать его на входе, ни навязывать на выходе.
+func TestSetBodyPreservesMissingTrailingNewline(t *testing.T) {
+	p := writeTemp(t, sampleTask)
+	if err := SetBody(p, "тело без переноса в конце"); err != nil {
+		t.Fatalf("SetBody: %v", err)
+	}
+	after, _ := os.ReadFile(p)
+	if strings.HasSuffix(string(after), "\n") {
+		t.Errorf("SetBody добавил перевод строки в конец, которого не было в body:\n%q", after)
+	}
+}
+
+func TestSetBodyEmptyBody(t *testing.T) {
+	p := writeTemp(t, sampleTask)
+	if err := SetBody(p, ""); err != nil {
+		t.Fatalf("SetBody: %v", err)
+	}
+	after, _ := os.ReadFile(p)
+	body, err := Body(after)
+	if err != nil {
+		t.Fatalf("Body: %v", err)
+	}
+	if body != "" {
+		t.Errorf("тело обязано быть пустым, получено: %q", body)
+	}
+}
+
+func TestSetBodyRejectsFileWithoutFrontmatter(t *testing.T) {
+	p := writeTemp(t, "# Просто заметка\n")
+	if err := SetBody(p, "новое тело"); err == nil {
+		t.Fatal("файл без фронтматтера обязан давать ошибку")
+	}
+}
+
+func TestVersionChangesAfterWrite(t *testing.T) {
+	p := writeTemp(t, sampleTask)
+	before, err := Version(p)
+	if err != nil {
+		t.Fatalf("Version: %v", err)
+	}
+	if err := SetField(p, "status", "ready"); err != nil {
+		t.Fatal(err)
+	}
+	after, err := Version(p)
+	if err != nil {
+		t.Fatalf("Version: %v", err)
+	}
+	if before == after {
+		t.Error("версия не изменилась после записи")
+	}
+}
+
+func TestVersionStableWithoutWrite(t *testing.T) {
+	p := writeTemp(t, sampleTask)
+	a, err := Version(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := Version(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Errorf("версия неизменного файла разошлась: %q != %q", a, b)
+	}
+}
+
 func TestSetBlockPreservesCRLFAndBOM(t *testing.T) {
 	crlf := "\ufeff" + strings.ReplaceAll(sampleTask, "\n", "\r\n")
 	p := writeTemp(t, crlf)

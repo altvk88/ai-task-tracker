@@ -52,8 +52,11 @@ func New(ix *index.Index, vaultDir string, opts Options) *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/snapshot", s.handleSnapshot)
+	mux.HandleFunc("/api/task", s.handleCreateTask)
 	mux.HandleFunc("/api/task/{id}", s.handleTask)
 	mux.HandleFunc("/api/task/{id}/status", s.handleSetStatus)
+	mux.HandleFunc("/api/task/{id}/field", s.handleSetField)
+	mux.HandleFunc("/api/task/{id}/body", s.handleSetBody)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/", handleAPINotFound)
 	mux.Handle("/", staticHandler())

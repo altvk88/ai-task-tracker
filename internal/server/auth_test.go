@@ -118,6 +118,39 @@ func TestAuth_подделанныйXForwardedForНеДаётДоступа(t *t
 	}
 }
 
+// Новые ручки (/field, /body, POST /api/task) обязаны подчиняться тому же
+// правилу авторизации, что и /status: с loopback можно без токена, из
+// локальной сети запись требует его. Проверяем не глазами, а тестом — это
+// отдельный пункт приёмки задачи.
+func TestAuth_новыеРучкиТребуютТокенИзСети(t *testing.T) {
+	routes := []string{
+		"/api/task/W-001/field",
+		"/api/task/W-001/body",
+		"/api/task",
+	}
+	for _, path := range routes {
+		t.Run(path, func(t *testing.T) {
+			srv := newAuthServer(t, "секрет")
+
+			rr := doWithAddr(srv, http.MethodPost, path, "203.0.113.5:5555", nil)
+			if rr.Code != http.StatusUnauthorized {
+				t.Fatalf("без токена из сети: код = %d, ожидался 401, тело: %s", rr.Code, rr.Body.String())
+			}
+
+			rr = doWithAddr(srv, http.MethodPost, path, "127.0.0.1:5555", nil)
+			if rr.Code == http.StatusUnauthorized {
+				t.Fatalf("с loopback без токена: получен 401, тело: %s", rr.Body.String())
+			}
+
+			rr = doWithAddr(srv, http.MethodPost, path, "203.0.113.5:5555",
+				map[string]string{"Authorization": "Bearer секрет"})
+			if rr.Code == http.StatusUnauthorized {
+				t.Fatalf("с верным токеном из сети: получен 401, тело: %s", rr.Body.String())
+			}
+		})
+	}
+}
+
 func TestIsLoopbackAddr(t *testing.T) {
 	cases := map[string]bool{
 		"127.0.0.1:80":   true,

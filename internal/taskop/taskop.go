@@ -90,12 +90,37 @@ func SchemaPath(vaultDir string) string {
 // и снимаем при уходе из неё, а не вокруг каждой записи — иначе правка любого
 // поля у своей же таски в работе упиралась бы в собственный замок.
 func Set(vaultDir, id, key, value, agent string) (Result, error) {
+	return setChecked(vaultDir, id, key, value, agent, "")
+}
+
+// SetIfVersion — то же самое, что Set, но перед записью сверяет текущую
+// vault.Version файла с baseVersion и отказывает конфликтом (KindRejected),
+// если файл поменялся с момента, когда вызывающий его читал.
+//
+// Нужна HTTP-панели: файлы правит не только она, а ещё CLI-агенты и человек
+// в Obsidian, и тихая перезапись чужой правки недопустима. У CLI такой
+// проблемы нет — там за терминалом один оператор, поэтому Set её не требует.
+func SetIfVersion(vaultDir, id, key, value, agent, baseVersion string) (Result, error) {
+	if baseVersion == "" {
+		return Result{}, failf(KindBadValue, "не указан baseVersion")
+	}
+	return setChecked(vaultDir, id, key, value, agent, baseVersion)
+}
+
+// setChecked — общая реализация Set и SetIfVersion. Пустой baseVersion
+// значит «проверку версии не делать» (путь Set).
+func setChecked(vaultDir, id, key, value, agent, baseVersion string) (Result, error) {
 	if !writableFields[key] {
 		return Result{}, failf(KindBadValue, "поле %q не разрешено менять", key)
 	}
 	schema, byID, task, err := locate(vaultDir, id)
 	if err != nil {
 		return Result{}, err
+	}
+	if baseVersion != "" {
+		if err := checkVersion(task.Path, baseVersion); err != nil {
+			return Result{}, err
+		}
 	}
 
 	if key != "status" {
@@ -142,6 +167,21 @@ func Set(vaultDir, id, key, value, agent string) (Result, error) {
 		os.Remove(filepath.Join(vaultDir, ".locks", id+".lock"))
 	}
 	return reread(task, task.Status, canon)
+}
+
+// checkVersion сверяет текущую версию файла с той, что вызывающий получил
+// при чтении. Несовпадение — конфликт конкурентной правки, а не поломка:
+// KindRejected, как и у отклонённого перехода статуса, — оба уже отвечают
+// 409 в statusCodeFor.
+func checkVersion(path, baseVersion string) error {
+	current, err := vault.Version(path)
+	if err != nil {
+		return failf(KindWrite, "%w", err)
+	}
+	if current != baseVersion {
+		return failf(KindRejected, "таску изменили после того, как вы её открыли — обновите и попробуйте снова")
+	}
+	return nil
 }
 
 func unparsable(id, parseErr string) *Error {

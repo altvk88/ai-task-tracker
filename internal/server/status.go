@@ -52,18 +52,7 @@ func (s *Server) handleSetStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Индекс обновляем сами, не дожидаясь fsnotify: у наблюдателя дебаунс
-	// 50 мс, и ответ 200 успел бы уйти раньше, чем изменение стало видно в
-	// /api/snapshot. Apply идемпотентен — когда следом придёт событие от
-	// fsnotify, содержимое уже совпадёт, изменения не будет и второго
-	// SSE-события подписчики не получат.
-	task := res.Task
-	if change, changed := s.ix.Apply(res.Task.Path); changed {
-		task = change.Task
-	}
-
-	status, _ := s.ix.Schema().Normalize(task.Status)
-	writeJSON(w, http.StatusOK, toAPITask(task, status))
+	writeJSON(w, http.StatusOK, s.respondWithTask(res.Task))
 }
 
 // agent — под чьим именем сервер claim'ит таски. Веб-клиент — отдельный
