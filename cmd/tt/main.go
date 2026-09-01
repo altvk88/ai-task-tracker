@@ -214,9 +214,17 @@ func run(cmd string, args []string) error {
 		if err != nil {
 			return err
 		}
+		// --listen принимает и голый адрес ("0.0.0.0"), и полный ("0.0.0.0:4180").
+		// Без этого `--listen 0.0.0.0 --port 4179` падал с «missing port in address»:
+		// в справке флаги описаны как независимые, значит и сочетаться должны.
 		addr := *listen
-		if addr == "" {
+		switch {
+		case addr == "":
 			addr = net.JoinHostPort("localhost", fmt.Sprint(*port))
+		case !strings.Contains(addr, ":"):
+			addr = net.JoinHostPort(addr, fmt.Sprint(*port))
+		case strings.HasSuffix(addr, ":"):
+			addr = net.JoinHostPort(strings.TrimSuffix(addr, ":"), fmt.Sprint(*port))
 		}
 
 		tok := *token
@@ -267,9 +275,13 @@ func serve(ctx context.Context, vaultDir, addr, agent, token string) error {
 	// Токен печатается один раз, здесь и только здесь: другого способа его
 	// узнать нет (в логи и в файлы vault он не пишется), а ссылка с
 	// ?token= позволяет открыть доску с телефона одним касанием.
-	fmt.Printf("tt serve: http://%s\n", ln.Addr())
-	fmt.Printf("токен на запись (для доступа не с этого компьютера): %s\n", token)
-	fmt.Printf("ссылка с токеном: http://%s/?token=%s\n", ln.Addr(), token)
+	for _, host := range reachableHosts(ln.Addr()) {
+		fmt.Printf("tt serve: http://%s\n", host)
+	}
+	fmt.Printf("токен на запись (нужен только не с этого компьютера): %s\n", token)
+	for _, host := range reachableHosts(ln.Addr()) {
+		fmt.Printf("  с телефона: http://%s/?token=%s\n", host, token)
+	}
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- httpSrv.Serve(ln) }()
@@ -289,4 +301,36 @@ func serve(ctx context.Context, vaultDir, addr, agent, token string) error {
 		}
 		return nil
 	}
+}
+
+// reachableHosts превращает адрес слушателя в список того, что человек может
+// набрать в браузере. При привязке к 0.0.0.0 или [::] стандартный Addr() даёт
+// «http://[::]:4179» — такое в телефон не введёшь, поэтому для wildcard-адреса
+// подставляются реальные адреса машины в сети.
+func reachableHosts(addr net.Addr) []string {
+	host, port, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return []string{addr.String()}
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && !ip.IsUnspecified() {
+		return []string{net.JoinHostPort(host, port)}
+	}
+
+	// Слушаем на всех интерфейсах — показываем localhost и адреса в сети.
+	out := []string{net.JoinHostPort("localhost", port)}
+	ifaces, err := net.InterfaceAddrs()
+	if err != nil {
+		return out
+	}
+	for _, a := range ifaces {
+		n, ok := a.(*net.IPNet)
+		// Отбрасываем link-local (169.254.x.x): это APIPA, адрес «DHCP не ответил»,
+		// по нему всё равно ничего не откроется, а в списке онтолько мешает.
+		if !ok || n.IP.IsLoopback() || n.IP.IsLinkLocalUnicast() || n.IP.To4() == nil {
+			continue
+		}
+		out = append(out, net.JoinHostPort(n.IP.String(), port))
+	}
+	return out
 }
