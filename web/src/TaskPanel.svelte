@@ -12,6 +12,18 @@
   import { selectedId, tasksById, authHeaders, patchTask } from './store.js';
   import { renderMarkdown } from './markdown.js';
   import { diffFields, describeSaveError } from './edit.js';
+  import { applyFormat, FORMAT_ACTIONS } from './format.js';
+
+  const FORMAT_LABELS = {
+    bold: ['Ж', 'Жирный'],
+    italic: ['К', 'Курсив'],
+    heading: ['H', 'Заголовок'],
+    list: ['•', 'Список'],
+    checkbox: ['☑', 'Чек-бокс'],
+    link: ['🔗', 'Ссылка'],
+    table: ['▦', 'Таблица'],
+    code: ['</>', 'Код'],
+  };
 
   const CLOSED_STATUSES = new Set(['done', 'cancelled']);
   const PRIORITIES = ['high', 'medium', 'low'];
@@ -31,6 +43,47 @@
   let saving = $state(false);
   let saveError = $state('');
   let conflict = $state(false);
+
+  // Вкладка тела в режиме правки: «Правка» — textarea с кнопками
+  // форматирования, «Предпросмотр» — рендер того же draft.body через
+  // renderMarkdown. Переключение не трогает draft, поэтому набранное не
+  // теряется (см. AC «переключение вкладок не теряет набранное»).
+  let bodyTab = $state('edit');
+  let bodyTextarea = $state(null);
+
+  /**
+   * Кнопка форматирования (TT-055). Подставляет вычисленный applyFormat()
+   * фрагмент через document.execCommand('insertText', ...), а не
+   * присваиванием draft.body = ...: присваивание значения textarea в обход
+   * родных команд редактирования стирает историю браузера, и Ctrl+Z после
+   * нажатия кнопки перестаёт работать. execCommand('insertText') — это та
+   * же операция, что и обычная печать/вставка, поэтому она пишется в
+   * нативный undo-стек textarea и корректно отменяется. bind:value уже
+   * слушает событие 'input', которое execCommand сама генерирует, so
+   * draft.body синхронизируется без ручного присваивания.
+   *
+   * Фокус остаётся в поле: кнопки используют onmousedown с preventDefault,
+   * поэтому клик по кнопке никогда не переводит фокус на неё — textarea не
+   * теряет ни фокус, ни выделение между чтением selectionStart/End и вызовом
+   * execCommand.
+   */
+  function insertFormat(action) {
+    const el = bodyTextarea;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const result = applyFormat(draft.body, start, end, action);
+    el.focus();
+    el.setSelectionRange(start, end);
+    const applied = document.execCommand && document.execCommand('insertText', false, result.snippet);
+    if (!applied) {
+      // Запасной путь для окружений без execCommand: работает корректно,
+      // но теряет историю отмены для этой вставки — редкий случай, не
+      // основной путь в актуальных браузерах.
+      draft.body = result.text;
+    }
+    el.setSelectionRange(result.selectionStart, result.selectionEnd);
+  }
 
   $effect(() => {
     const id = $selectedId;
@@ -91,6 +144,7 @@
     baseVersion = detail.version;
     saveError = '';
     conflict = false;
+    bodyTab = 'edit';
     editing = true;
   }
 
@@ -292,7 +346,34 @@
         <div class="panel-section">
           <h3>Тело</h3>
           {#if editing}
-            <textarea class="field-input textarea body-textarea" bind:value={draft.body} rows="10"></textarea>
+            <div class="body-tabs" role="tablist">
+              <button type="button" class="body-tab" class:active={bodyTab === 'edit'} onclick={() => (bodyTab = 'edit')}>Правка</button>
+              <button type="button" class="body-tab" class:active={bodyTab === 'preview'} onclick={() => (bodyTab = 'preview')}>Предпросмотр</button>
+            </div>
+            {#if bodyTab === 'edit'}
+              <div class="format-toolbar">
+                {#each FORMAT_ACTIONS as action (action)}
+                  <button
+                    type="button"
+                    class="format-btn"
+                    title={FORMAT_LABELS[action][1]}
+                    aria-label={FORMAT_LABELS[action][1]}
+                    onmousedown={(e) => e.preventDefault()}
+                    onclick={() => insertFormat(action)}
+                  >
+                    {FORMAT_LABELS[action][0]}
+                  </button>
+                {/each}
+              </div>
+              <textarea
+                class="field-input textarea body-textarea"
+                bind:value={draft.body}
+                bind:this={bodyTextarea}
+                rows="10"
+              ></textarea>
+            {:else}
+              <div class="markdown-body body-preview">{@html renderMarkdown(draft.body)}</div>
+            {/if}
           {:else if detail.body}
             <div class="markdown-body">{@html renderMarkdown(detail.body)}</div>
           {:else}

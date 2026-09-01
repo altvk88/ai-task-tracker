@@ -387,7 +387,11 @@ h1 {
 }
 
 .panel {
-  width: min(28rem, 100vw);
+  /* TT-055: было 28rem (~450px) — тело в колонку шириной с телефон, таблицы
+     скроллились вбок. 48rem (~770px) даёт таблицам и коду место, но всё ещё
+     оставляет часть доски видимой на широком мониторе. min(..., 100vw)
+     по-прежнему разворачивает панель на весь экран на телефоне. */
+  width: min(48rem, 100vw);
   height: 100%;
   background: var(--bg);
   border-left: 1px solid var(--border);
@@ -660,6 +664,59 @@ h1 {
 
 .conflict-banner p {
   margin: 0 0 0.5rem;
+}
+
+/* Тело таски в режиме правки (TT-055): панель кнопок форматирования + вкладки
+   «Правка»/«Предпросмотр» над textarea. */
+
+.body-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.4rem;
+}
+
+.body-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 0.82rem;
+  padding: 0.2rem 0.1rem;
+  cursor: pointer;
+}
+
+.body-tab.active {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
+.format-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.35rem;
+}
+
+.format-btn {
+  background: var(--card-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  min-width: 1.9rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.format-btn:hover {
+  border-color: var(--accent);
+}
+
+.body-preview {
+  min-height: 10rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem;
 }
 
 .create-form {
