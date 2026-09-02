@@ -34,6 +34,7 @@ const usage = `tt — таск-трекер над markdown-vault
   tt serve  [--vault ПУТЬ] [--port N] [--listen АДРЕС] [--agent ИМЯ] [--token ТОКЕН]
   tt config show [--vault ПУТЬ] [--port N]
   tt config set  [--vault ПУТЬ] [--port N]
+  tt version
 
 Путь к vault берётся из --vault, иначе из переменной TT_VAULT, иначе из файла
 настроек (см. tt config). Порт tt serve — из --port, иначе из файла настроек,
@@ -287,6 +288,10 @@ func run(cmd string, args []string) error {
 		default:
 			return fmt.Errorf("неизвестная подкоманда %q для tt config: show|set", sub)
 		}
+
+	case "version", "--version", "-v":
+		cli.PrintVersion(os.Stdout)
+		return nil
 
 	case "help", "--help", "-h":
 		fmt.Print(usage)

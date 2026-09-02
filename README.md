@@ -46,6 +46,24 @@ rsrc -ico assets/tt.ico -arch amd64 -o cmd/tt/rsrc_windows.syso
 Суффикс `_windows` в имени `.syso` обязателен: без него Go попытается
 прилинковать ресурс Windows и при сборке под другие системы.
 
+### Версия
+
+Номер версии живёт в **одном** месте — файле `VERSION` в корне. Его читают все трое:
+`tt version` (через `go:embed`, см. `version.go`), `installer/tt.iss` (препроцессором
+ISPP) и `installer/macos/build.sh`. Поднять версию — значит поправить `VERSION`, больше
+нигде число не зашито.
+
+```bash
+echo 1.0.4 > VERSION      # и пересобрать: бинарник, установщик, архивы macOS
+tt version                # tt 1.0.4 (windows/amd64, go1.27.0)
+```
+
+Имя установщика содержит версию (`tt-setup-1.0.3.exe`), поэтому сборки не
+перезаписывают друг друга и по имени файла видно, что внутри.
+
+Версия плагина Obsidian (`obsidian-plugin/manifest.json`) живёт **отдельно**: её читает
+сам Obsidian, у плагина свой цикл выпуска, и выравнивать её с версией `tt` не нужно.
+
 ### Установщик Windows
 
 `installer/tt.iss` — скрипт Inno Setup 6 (ставится через winget:
@@ -65,7 +83,8 @@ go build -o tt.exe ./cmd/tt
 Setup: winget кладёт его в профиль пользователя, установщик с сайта по умолчанию
 — в `C:\Program Files (x86)\Inno Setup 6\`.
 
-Готовый `.exe` появляется в `installer/Output/` (в git не коммитится). Установщик
+Готовый `.exe` появляется в `installer/windows/` — рядом с `installer/macos/`, где
+лежат архивы для macOS; в git артефакты не коммитятся. Установщик
 не требует прав администратора: каталог по умолчанию — в профиле пользователя,
 PATH и автозагрузка правятся per-user (`HKCU\Environment`, `{userstartup}`).
 

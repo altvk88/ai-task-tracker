@@ -18,7 +18,12 @@
 ; в автозагрузке работает без них и делает то же самое.
 
 #define MyAppName "tt"
-#define MyAppVersion "1.0.0"
+; Версия берётся из файла VERSION в корне репозитория — того же, что читают
+; "tt version" и installer/macos/build.sh. Второго места, где число правят
+; руками, быть не должно: именно поэтому установщик всё время назывался 1.0.0.
+#define VersionFile FileOpen("..\VERSION")
+#define MyAppVersion Trim(FileRead(VersionFile))
+#expr FileClose(VersionFile)
 #define MyAppExeName "tt.exe"
 
 [Setup]
@@ -30,7 +35,7 @@ DefaultDirName={localappdata}\Programs\tt
 DefaultGroupName=tt
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-OutputDir=Output
+OutputDir=windows
 OutputBaseFilename=tt-setup-{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes

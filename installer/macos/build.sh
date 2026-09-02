@@ -17,7 +17,10 @@ set -eu
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 DIST="$HERE/dist"
-VERSION="1.0.0"
+# Версия — из общего файла VERSION в корне репозитория: его же читают
+# "tt version" и installer/tt.iss. Второго места, где число правят руками, быть
+# не должно.
+VERSION="$(sed -n '1s/[[:space:]]*$//p' "$ROOT/VERSION")"
 
 cd "$ROOT/web" && npm install && npm run build
 cd "$ROOT/obsidian-plugin" && npm install && npm run build
