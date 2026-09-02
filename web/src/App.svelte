@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { snapshot, loadSnapshot, startLiveUpdates, notice, dismissNotice, view } from './store.js';
+  import { snapshot, loadSnapshot, startLiveUpdates, notice, dismissNotice, view, connectionState } from './store.js';
   import Toolbar from './Toolbar.svelte';
   import Board from './Board.svelte';
   import Pulse from './Pulse.svelte';
@@ -21,6 +21,11 @@
     <button type="button" class:active={$view === 'board'} onclick={() => view.set('board')}>Доска</button>
     <button type="button" class:active={$view === 'pulse'} onclick={() => view.set('pulse')}>Пульс</button>
   </nav>
+  <div class="conn-status" class:offline={$connectionState === 'offline'} role="status" aria-live="polite">
+    <span class="conn-dot" aria-hidden="true"></span>
+    {$connectionState === 'offline' ? 'Нет связи — данные могли устареть' : 'Онлайн'}
+  </div>
+  <button type="button" class="btn conn-refresh" onclick={() => loadSnapshot()} title="Обновить данные">↻ Обновить</button>
   {#if $view === 'board'}<Toolbar />{/if}
 </header>
 

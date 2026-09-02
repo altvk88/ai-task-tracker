@@ -169,15 +169,55 @@ export async function loadSnapshot() {
   }
 }
 
-// --- Живое обновление ---------------------------------------------------
+// --- Живое обновление -----------------------------------------------------
 
-/** Подписывается на поток изменений. Возвращает функцию остановки. */
+/**
+ * Есть ли сейчас связь с сервером (TT-061). 'online' до первого отказа —
+ * оптимистично, чтобы не мигать индикатором на старте, пока первое
+ * соединение ещё открывается штатно за доли секунды.
+ */
+export const connectionState = writable('online');
+
+// Ноутбук закрыли и открыли — TCP-соединение к этому моменту обычно уже
+// мертво, но браузер видит это не сразу (а иногда и вовсе не присылает
+// onerror, если ОС просто заморозила вкладку без явного разрыва сокета).
+// Поэтому при возврате видимости или восстановлении сети закрываем старое
+// соединение и открываем новое сами, не дожидаясь, заметит ли это
+// EventSource. Дублирующие события (visibilitychange и online почти
+// одновременно) гасим минимальным интервалом между перезапусками.
+const WAKE_DEBOUNCE_MS = 2000;
+
+/** Подписывается на поток изменений и на признаки «устройство ожило». */
 export function startLiveUpdates() {
-  return startLive({
+  const options = {
     createSource: (url) => new EventSource(url),
     onChange: (change) => snapshot.update((s) => ({ ...s, tasks: applyChange(s.tasks, change) })),
     onResync: () => void loadSnapshot(),
-  });
+    onStatus: (status) => connectionState.set(status),
+  };
+
+  let stop = startLive(options);
+  let lastRestart = 0;
+
+  const onWake = () => {
+    const now = Date.now();
+    if (now - lastRestart < WAKE_DEBOUNCE_MS) return;
+    lastRestart = now;
+    stop();
+    stop = startLive(options);
+    void loadSnapshot();
+  };
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') onWake();
+  };
+  document.addEventListener('visibilitychange', onVisible);
+  window.addEventListener('online', onWake);
+
+  return () => {
+    stop();
+    document.removeEventListener('visibilitychange', onVisible);
+    window.removeEventListener('online', onWake);
+  };
 }
 
 // --- Уведомления --------------------------------------------------------

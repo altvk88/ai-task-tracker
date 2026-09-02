@@ -58,13 +58,14 @@ FakeSource.opened = [];
 
 function harness() {
   FakeSource.opened = [];
-  const calls = { resync: 0, changes: [], timers: [] };
+  const calls = { resync: 0, changes: [], timers: [], statuses: [] };
   const stop = startLive({
     createSource: () => new FakeSource(),
     onChange: (c) => calls.changes.push(c),
     onResync: () => {
       calls.resync += 1;
     },
+    onStatus: (s) => calls.statuses.push(s),
     setTimer: (fn, ms) => {
       calls.timers.push({ fn, ms });
       return calls.timers.length;
@@ -124,4 +125,28 @@ test('после остановки переподключений не план
   stop();
   sources[0].onerror();
   assert.deepEqual(calls.timers, []);
+});
+
+test('обрыв сообщает offline один раз, восстановление — online', () => {
+  const { calls, stop, sources } = harness();
+
+  sources[0].onerror();
+  sources[0].onerror(); // повторный onerror того же источника — не дублирует статус
+  assert.deepEqual(calls.statuses, ['offline']);
+
+  calls.timers[0].fn();
+  sources[1].onerror(); // ещё не восстановились — статус уже offline, повторно не шлём
+  assert.deepEqual(calls.statuses, ['offline']);
+
+  calls.timers[1].fn();
+  sources[2].onopen();
+  assert.deepEqual(calls.statuses, ['offline', 'online']);
+  stop();
+});
+
+test('первое успешное открытие статус не шлёт — по умолчанию уже online', () => {
+  const { calls, stop, sources } = harness();
+  sources[0].onopen();
+  assert.deepEqual(calls.statuses, []);
+  stop();
 });

@@ -8,11 +8,14 @@
 /** Пауза перед первой попыткой переподключения. */
 export const RECONNECT_BASE_MS = 1000;
 
-// Потолок паузы. 30 секунд — период пульса сервера (defaultHeartbeat в
-// internal/server/sse.go): доска, простоявшая без связи дольше одного пульса,
-// уже заметно врёт, а реже раза в полминуты стучаться в поднявшийся обратно
-// сервер незачем.
-export const RECONNECT_MAX_MS = 30000;
+// Потолок паузы. Было 30 секунд по периоду пульса сервера (defaultHeartbeat в
+// internal/server/sse.go) — но сервер на своей же машине поднимается за доли
+// секунды, и полминуты молчания перед следующей попыткой означают полминуты
+// устаревшей доски сверх того, что уже показывает признак обрыва (TT-061).
+// 8 секунд — это всего 4-й шаг экспоненты (1-2-4-8), после которого доска уже
+// явно предупредила о разрыве, а частить чаще незачем: не мучаем сервер,
+// который либо ещё не поднялся, либо неисправен по другой причине.
+export const RECONNECT_MAX_MS = 8000;
 
 /** Пауза перед попыткой номер `attempt` (1 — первая): 1с, 2с, 4с… до потолка. */
 export function reconnectDelay(attempt) {
@@ -70,6 +73,10 @@ export function startLive({
   createSource,
   onChange,
   onResync,
+  // Сообщает 'online'/'offline' наружу — источник признака связи в шапке
+  // (TT-061). Вызывается только на смене состояния, не на каждой попытке:
+  // иначе серия неудачных переподключений дёргала бы индикатор туда-сюда.
+  onStatus = () => {},
   setTimer = setTimeout,
   clearTimer = clearTimeout,
   delay = reconnectDelay,
@@ -78,6 +85,13 @@ export function startLive({
   let timer = null;
   let attempt = 0;
   let stopped = false;
+  let offline = false;
+
+  const setOffline = (v) => {
+    if (offline === v) return;
+    offline = v;
+    onStatus(v ? 'offline' : 'online');
+  };
 
   const open = () => {
     timer = null;
@@ -89,6 +103,7 @@ export function startLive({
       // За время обрыва события потеряны, поэтому после переподключения
       // состояние собираем заново. При самом первом открытии снимок уже
       // грузит вызывающий — второй запрос не нужен.
+      setOffline(false);
       if (attempt > 0) onResync();
       attempt = 0;
     };
@@ -99,6 +114,7 @@ export function startLive({
       // планируем ровно одну повторную попытку на соединение.
       if (dead) return;
       dead = true;
+      setOffline(true);
       src.close();
       if (source === src) source = null;
       if (stopped) return;
