@@ -151,7 +151,6 @@ h1 img {
   flex: 1;
 }
 
-.toolbar select,
 .toolbar .search {
   background: var(--card-bg);
   color: var(--fg);
@@ -172,6 +171,49 @@ h1 img {
   font-size: 0.85rem;
   color: var(--muted);
   white-space: nowrap;
+}
+
+/* Дропдаун с чекбоксами для выбора нескольких проектов (TT-062). */
+
+.project-filter {
+  position: relative;
+}
+
+.project-menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 25;
+  min-width: 12rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.35rem;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+}
+
+.project-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.35rem;
+  font-size: 0.85rem;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.project-option:hover {
+  background: var(--lane-bg);
+}
+
+.project-empty {
+  margin: 0;
+  padding: 0.25rem 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .toolbar .counter {
@@ -284,6 +326,24 @@ h1 img {
   color: var(--muted);
   font-size: 0.72rem;
   margin-bottom: 0.15rem;
+}
+
+.card-id-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+/* Проект на карточке — только когда на доске несколько проектов сразу
+   (TT-062, showProjectOnCard в store.js). */
+.card-project {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 0.3rem;
+  border-radius: 3px;
+  background: var(--lane-bg);
 }
 
 .card-title {

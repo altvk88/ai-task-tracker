@@ -1,7 +1,7 @@
 <script>
   // Карточка таски. За данными в сеть не ходит — всё уже посчитано в store.js
   // (isOldClosed, liveBlockers); в store же уходит и перенос при перетаскивании.
-  import { moveTask, selectedId } from './store.js';
+  import { moveTask, selectedId, showProjectOnCard } from './store.js';
 
   let { task } = $props();
 
@@ -95,7 +95,10 @@
   onkeydown={(e) => e.key === 'Enter' && select()}
 >
   <div class="card-head">
-    <span class="card-id">{task.id}</span>
+    <span class="card-id-group">
+      <span class="card-id">{task.id}</span>
+      {#if $showProjectOnCard && task.project}<span class="card-project">{task.project}</span>{/if}
+    </span>
     {#if task.liveBlockers?.length}
       <span class="lock" title={blockedTitle}>🔒</span>
     {/if}

@@ -5,7 +5,7 @@ import { writable, derived, get } from 'svelte/store';
 import { applyChange, startLive } from './live.js';
 import { normalizeStatus } from './status.js';
 import { computePulse } from './pulse.js';
-import { loadStoredProject, storeProject, resolveInitialProject } from './view-state.js';
+import { loadStoredProjects, storeProjects, resolveSelectedProjects, projectMatches } from './view-state.js';
 
 // Раскладка по лейнам скопирована по смыслу с obsidian-plugin/src/lanes.ts —
 // тот же порядок статусов, те же правила для пустых и неизвестных лейнов.
@@ -102,23 +102,23 @@ function daysSince(dateStr) {
 
 export const snapshot = writable({ tasks: [], schema: null, summary: null, loading: true, error: '' });
 
-// Проект — единственное поле фильтра, которое переживает перезагрузку
-// страницы (TT-059, см. обоснование в view-state.js). Значение из
-// localStorage подставляется оптимистично ещё до загрузки снимка; если
-// снимок придёт без такого проекта, ниже он сам откатится к ''.
-export const filter = writable({ project: loadStoredProject(), query: '', showOldClosed: false });
+// Набор проектов — единственное поле фильтра, которое переживает
+// перезагрузку страницы (TT-059/TT-062, см. обоснование в view-state.js).
+// Значение из localStorage подставляется оптимистично ещё до загрузки
+// снимка; если снимок придёт без части проектов, ниже набор сам сузится.
+export const filter = writable({ projects: loadStoredProjects(), query: '', showOldClosed: false });
 
-// Каждое изменение проекта — сразу в localStorage.
-filter.subscribe(($filter) => storeProject($filter.project));
+// Каждое изменение набора — сразу в localStorage.
+filter.subscribe(($filter) => storeProjects($filter.projects));
 
-// Сохранённый (или уже выбранный) проект может исчезнуть из снимка —
+// Сохранённые (или уже выбранные) проекты могут исчезнуть из снимка —
 // переименовали, удалили таски, открыли другой vault. Проверяем при каждой
 // загрузке схемы, а не только один раз при старте: то же самое может
 // произойти и посреди работы, когда снимок обновится сам.
 snapshot.subscribe(($snapshot) => {
   if (!$snapshot.schema) return;
   const available = [...new Set($snapshot.tasks.map((t) => t.project).filter(Boolean))];
-  filter.update((f) => ({ ...f, project: resolveInitialProject(f.project, available) }));
+  filter.update((f) => ({ ...f, projects: resolveSelectedProjects(f.projects, available) }));
 });
 
 /** Список проектов, встречающихся в снимке, для выпадающего фильтра тулбара. */
@@ -156,11 +156,19 @@ export const visibleTasks = derived([enrichedTasks, filter], ([$tasks, $filter])
   const q = $filter.query.trim().toLowerCase();
   return $tasks.filter((t) => {
     if (!$filter.showOldClosed && t.isOldClosed) return false;
-    if ($filter.project && t.project !== $filter.project) return false;
+    if (!projectMatches($filter.projects, t.project)) return false;
     if (q && !t.id.toLowerCase().includes(q) && !t.title.toLowerCase().includes(q)) return false;
     return true;
   });
 });
+
+/** Показывать ли проект на карточке (TT-062): не нужно, пока на доске один
+ *  проект — ни явно выбранный в одиночку, ни единственный существующий при
+ *  «Все проекты». Как только проектов на доске больше одного, без подписи
+ *  колонка превращается в кашу из неизвестно чьих карточек. */
+export const showProjectOnCard = derived([filter, projects], ([$filter, $projects]) =>
+  $filter.projects.length > 1 || ($filter.projects.length === 0 && $projects.length > 1)
+);
 
 export const lanes = derived([snapshot, visibleTasks], ([$snapshot, $visible]) =>
   $snapshot.schema ? buildLanes($snapshot.schema, $visible) : []
