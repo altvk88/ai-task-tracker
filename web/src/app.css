@@ -43,9 +43,19 @@ body {
 }
 
 h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 1.1rem;
   margin: 0;
   white-space: nowrap;
+}
+
+h1 img {
+  display: block;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .app-header {
