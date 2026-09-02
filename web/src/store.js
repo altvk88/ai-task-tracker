@@ -5,6 +5,7 @@ import { writable, derived, get } from 'svelte/store';
 import { applyChange, startLive } from './live.js';
 import { normalizeStatus } from './status.js';
 import { computePulse } from './pulse.js';
+import { loadStoredProject, storeProject, resolveInitialProject } from './view-state.js';
 
 // Раскладка по лейнам скопирована по смыслу с obsidian-plugin/src/lanes.ts —
 // тот же порядок статусов, те же правила для пустых и неизвестных лейнов.
@@ -101,7 +102,24 @@ function daysSince(dateStr) {
 
 export const snapshot = writable({ tasks: [], schema: null, summary: null, loading: true, error: '' });
 
-export const filter = writable({ project: '', query: '', showOldClosed: false });
+// Проект — единственное поле фильтра, которое переживает перезагрузку
+// страницы (TT-059, см. обоснование в view-state.js). Значение из
+// localStorage подставляется оптимистично ещё до загрузки снимка; если
+// снимок придёт без такого проекта, ниже он сам откатится к ''.
+export const filter = writable({ project: loadStoredProject(), query: '', showOldClosed: false });
+
+// Каждое изменение проекта — сразу в localStorage.
+filter.subscribe(($filter) => storeProject($filter.project));
+
+// Сохранённый (или уже выбранный) проект может исчезнуть из снимка —
+// переименовали, удалили таски, открыли другой vault. Проверяем при каждой
+// загрузке схемы, а не только один раз при старте: то же самое может
+// произойти и посреди работы, когда снимок обновится сам.
+snapshot.subscribe(($snapshot) => {
+  if (!$snapshot.schema) return;
+  const available = [...new Set($snapshot.tasks.map((t) => t.project).filter(Boolean))];
+  filter.update((f) => ({ ...f, project: resolveInitialProject(f.project, available) }));
+});
 
 /** Список проектов, встречающихся в снимке, для выпадающего фильтра тулбара. */
 export const projects = derived(snapshot, ($snapshot) =>
