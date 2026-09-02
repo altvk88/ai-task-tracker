@@ -16,7 +16,10 @@
 </script>
 
 <header class="app-header">
-  <h1><img src="/logo.png" alt="tt — трекер задач" width="28" height="28" />tt</h1>
+  <!-- Логотип вместо текста «tt» — так попросил владелец. Имя остаётся в alt:
+       заголовок страницы всё равно нужен программам чтения с экрана, а вкладку
+       браузера опознают по favicon и <title>. -->
+  <h1><img src="/logo.png" alt="tt — трекер задач" width="28" height="28" /></h1>
   <nav class="view-tabs">
     <button type="button" class:active={$view === 'board'} onclick={() => view.set('board')}>Доска</button>
     <button type="button" class:active={$view === 'pulse'} onclick={() => view.set('pulse')}>Пульс</button>
