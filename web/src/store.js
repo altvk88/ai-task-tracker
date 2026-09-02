@@ -13,7 +13,10 @@ import { loadStoredProjects, storeProjects, resolveSelectedProjects, projectMatc
 // пакет, который можно было бы просто заимпортировать в Vite-сборку.
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const OLD_CLOSED_DAYS = 14;
+// Порог «старая закрытая» (TT-063). Зашит константой, но не молча: подпись
+// галочки в Toolbar.svelte подставляет то же число, так что менять его —
+// значит менять и то, что видит человек.
+export const OLD_CLOSED_DAYS = 14;
 const CLOSED_STATUSES = new Set(['done', 'cancelled']);
 
 // --- Токен на запись (TT-031) --------------------------------------------
@@ -63,9 +66,26 @@ function laneTitle(schema, id) {
 }
 
 /**
+ * Ключ сортировки «свежее — выше» (TT-063): по дате завершения для закрытых
+ * статусов, иначе по дате создания. Без даты — в конец колонки, а не в
+ * начало: пустая дата не значит «только что», обычно это как раз легаси-
+ * запись без даты, то есть скорее старая, чем свежая.
+ */
+function freshnessKey(t) {
+  const t1 = Date.parse(t.completed ?? '');
+  if (!Number.isNaN(t1)) return t1;
+  const t2 = Date.parse(t.created ?? '');
+  return Number.isNaN(t2) ? -Infinity : t2;
+}
+
+/**
  * Раскладывает таски по лейнам в порядке схемы. Пустые лейны сохраняются —
  * иначе доска прыгает под руками при фильтрации. Неизвестные статусы уходят
- * в один общий лейн в конце, а не по лейну на каждый такой статус.
+ * в один общий лейн в конце, а не по лейну на каждый такой статус. Внутри
+ * лейна — свежие сверху: без этого включение «старых закрытых» вываливает
+ * тысячу записей в порядке файловой системы, и первым на глаза попадается
+ * что попало, а не то, что человеку интереснее всего увидеть только что
+ * включив фильтр.
  */
 function buildLanes(schema, tasks) {
   const lanes = schema.statuses.map((st) => ({ lane: st.lane, status: st.id, tasks: [] }));
@@ -85,6 +105,7 @@ function buildLanes(schema, tasks) {
     }
     unknown.tasks.push(t);
   }
+  for (const l of lanes) l.tasks.sort((a, b) => freshnessKey(b) - freshnessKey(a));
   return lanes;
 }
 
@@ -152,15 +173,28 @@ const enrichedTasks = derived([snapshot, tasksById], ([$snapshot, $byId]) =>
     })
 );
 
-export const visibleTasks = derived([enrichedTasks, filter], ([$tasks, $filter]) => {
+/** Таски, прошедшие проект и поиск, но ДО отсечения старых закрытых — общий
+ *  знаменатель для видимых тасок и для счётчика скрытых (TT-063): иначе
+ *  счётчик считал бы по другому набору, чем реально фильтруется. */
+const projectAndSearchFiltered = derived([enrichedTasks, filter], ([$tasks, $filter]) => {
   const q = $filter.query.trim().toLowerCase();
   return $tasks.filter((t) => {
-    if (!$filter.showOldClosed && t.isOldClosed) return false;
     if (!projectMatches($filter.projects, t.project)) return false;
     if (q && !t.id.toLowerCase().includes(q) && !t.title.toLowerCase().includes(q)) return false;
     return true;
   });
 });
+
+export const visibleTasks = derived([projectAndSearchFiltered, filter], ([$tasks, $filter]) =>
+  $filter.showOldClosed ? $tasks : $tasks.filter((t) => !t.isOldClosed)
+);
+
+/** Сколько старых закрытых сейчас скрыто галочкой — обратная связь для
+ *  Toolbar.svelte (TT-063): без неё «ничего не изменилось» неотличимо от
+ *  поломки, особенно когда у выбранного проекта старых закрытых нет вовсе. */
+export const hiddenOldClosedCount = derived(projectAndSearchFiltered, ($tasks) =>
+  $tasks.reduce((n, t) => n + (t.isOldClosed ? 1 : 0), 0)
+);
 
 /** Показывать ли проект на карточке (TT-062): не нужно, пока на доске один
  *  проект — ни явно выбранный в одиночку, ни единственный существующий при

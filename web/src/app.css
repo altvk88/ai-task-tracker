@@ -173,6 +173,10 @@ h1 img {
   white-space: nowrap;
 }
 
+.hidden-count {
+  color: var(--muted);
+}
+
 /* Дропдаун с чекбоксами для выбора нескольких проектов (TT-062). */
 
 .project-filter {

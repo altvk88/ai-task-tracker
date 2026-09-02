@@ -2,7 +2,7 @@
   // Фильтр по проекту (дропдаун с чекбоксами, TT-062), поиск по ID/заголовку
   // и переключатель старых закрытых. Все изменения идут через store.js —
   // сам тулбар состояния не хранит, кроме того, открыт ли сам дропдаун.
-  import { filter, projects, visibleTasks, creating } from './store.js';
+  import { filter, projects, visibleTasks, creating, hiddenOldClosedCount, OLD_CLOSED_DAYS } from './store.js';
   import { describeProjectSelection } from './view-state.js';
 
   let projectMenuOpen = $state(false);
@@ -77,7 +77,8 @@
       checked={$filter.showOldClosed}
       onchange={(e) => filter.update((f) => ({ ...f, showOldClosed: e.target.checked }))}
     />
-    показывать старые закрытые
+    показывать закрытые старше {OLD_CLOSED_DAYS} дней
+    <span class="hidden-count">(скрыто: {$hiddenOldClosedCount})</span>
   </label>
 
   <button type="button" class="btn btn-primary" onclick={() => creating.set(true)}>+ Новая таска</button>
