@@ -10,6 +10,10 @@
 
 ## Recent changes
 
+- **2026-10-05, TT-066** — `install.ps1` в корне: установка из PowerShell без
+  предупреждения SmartScreen (установщик не подписан). Следующий шаг по подписи —
+  заявка в SignPath Foundation.
+
 Всё за 2026-08-31 и 2026-09-01.
 
 - **Этап 1** — ядро: `model`, `vault`, `taskop`, `cli`; `list`, `set`, `doctor`.
